@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:Sora;src:url(app/fonts/sora-400-latin.woff2) format('woff2');font-weight:100 800;}
+html,body{margin:0;background:#02040a;overflow:hidden}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:#03060F;font-family:Sora,sans-serif;color:#F7F1E8}
+.abs{position:absolute;left:0;top:0}
+.blob{position:absolute;border-radius:50%;width:1600px;height:1600px;left:-800px;top:-800px;will-change:transform}
+#particles{position:absolute;left:0;top:0;width:1920px;height:1080px}
+#grain{position:absolute;inset:0;opacity:.035;mix-blend-mode:overlay;background-size:256px 256px}
+#vig{position:absolute;inset:0;background:radial-gradient(ellipse 75% 85% at 50% 50%,transparent 50%,rgba(0,0,0,.66) 100%)}
+#cam{position:absolute;inset:0;perspective:2400px;perspective-origin:50% 50%;transform-style:preserve-3d}
+.cards{position:absolute;inset:0;transform-style:preserve-3d}
+.shadow{position:absolute;border-radius:50%;background:radial-gradient(ellipse at center,rgba(0,0,0,.7),rgba(0,0,0,0) 70%)}
+.sel{position:absolute;background:rgba(224,162,83,.30);border-radius:6px}
+.handle{position:absolute;width:5px;background:#E0A253;border-radius:3px}
+.handle::after{content:"";position:absolute;left:-7px;width:19px;height:19px;border-radius:50%;background:#E0A253}
+.handle.top::after{top:-15px}.handle.bot::after{bottom:-15px}
+.caret{position:absolute;width:4px;background:#F7DCA8;border-radius:2px}
+.vbar{position:absolute;bottom:0;width:10px;border-radius:5px;background:linear-gradient(#F7DCA8,#E0A253 60%,rgba(176,85,60,.6))}
+.line{position:absolute;height:4px;margin-top:-2px;transform-origin:0 50%;border-radius:2px;background:linear-gradient(90deg,rgba(247,220,168,.9),rgba(224,162,83,.8));box-shadow:0 0 16px rgba(224,162,83,.7)}
+.token{position:absolute;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.phone{position:absolute;left:-220px;top:-474px;width:440px;height:948px;transform-style:preserve-3d}
+.phwrap{position:absolute;left:0;top:0;transform-style:preserve-3d}
+.body{position:absolute;inset:0;border-radius:64px;
+  background:linear-gradient(135deg,#4a423a 0%,#171513 22%,#0b0a09 50%,#1d1a17 78%,#5a5047 100%);
+  box-shadow:0 70px 140px rgba(0,0,0,.62),0 20px 40px rgba(0,0,0,.45),inset 0 0 0 1.5px rgba(255,236,210,.22),inset 0 0 0 5px #0b0a09}
+.btn{position:absolute;right:-4px;width:5px;border-radius:0 3px 3px 0;background:linear-gradient(90deg,#2a2521,#6a5f55)}
+.screen{position:absolute;left:14px;top:14px;width:412px;height:920px;border-radius:50px;overflow:hidden;background:#0A0908;transform:translateZ(0)}
+.status{position:absolute;left:0;top:0;width:412px;height:28px;display:flex;align-items:center;justify-content:space-between;padding:0 26px 0 30px;box-sizing:border-box;font-size:13px;font-weight:600;color:#F7F1E8;letter-spacing:.01em}
+.status svg{height:12px;margin-left:5px;fill:currentColor}
+.punch{position:absolute;left:198px;top:8px;width:13px;height:13px;border-radius:50%;background:#020202;box-shadow:0 0 0 1.5px #1b1917}
+.vp{position:absolute;left:0;top:28px;width:412px;height:892px;overflow:hidden}
+.lay{position:absolute;overflow:hidden}
+.lay img{position:absolute;left:0;top:0;display:block}
+.glare{position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,rgba(255,255,255,.075) 0%,rgba(255,255,255,.02) 28%,transparent 42%)}
+.pops{position:absolute;left:14px;top:42px;width:412px;height:892px;transform-style:preserve-3d}
+.ov{position:absolute;inset:0;overflow:hidden}
+.touch{position:absolute;border-radius:50%;width:64px;height:64px;margin:-32px 0 0 -32px;background:rgba(255,248,236,.28);box-shadow:0 0 0 2px rgba(255,248,236,.55),0 0 24px rgba(255,240,220,.35)}
+.ring{position:absolute;border-radius:50%;border:3px solid;box-sizing:border-box}
+.tw{position:absolute;overflow:hidden;white-space:nowrap;padding:0.06em 0.08em}
+.ti{display:inline-block;will-change:transform}
+.grad{background-clip:text;-webkit-background-clip:text;color:transparent}
+#logoWrap{position:absolute;width:0;height:0}
+#logoGlow{position:absolute;border-radius:50%}
+#logoImg{position:absolute}
+#eq{position:absolute;display:flex;align-items:flex-end;gap:14px}
+#eq i{display:block;width:16px;border-radius:8px;background:linear-gradient(#F7DCA8,#E0A253 55%,#B0553C)}
+.tile{position:absolute;border-radius:27%;background:radial-gradient(circle at 50% 38%,#1c140c,#070605 70%);box-shadow:0 30px 70px rgba(0,0,0,.6),inset 0 0 0 2px rgba(247,220,168,.16),0 0 90px rgba(224,162,83,.28)}
+.tile img{position:absolute}
+#botc{position:absolute;border-radius:50%;background:radial-gradient(circle at 40% 35%,#2a2119,#0b0908 72%);box-shadow:0 30px 70px rgba(0,0,0,.6),inset 0 0 0 3px rgba(224,162,83,.55),0 0 80px rgba(224,162,83,.25)}
+#beam{position:absolute;width:6px;margin-left:-3px;border-radius:3px;background:linear-gradient(rgba(247,220,168,.9),rgba(224,162,83,.5),rgba(247,220,168,.9));box-shadow:0 0 18px rgba(224,162,83,.7)}
+.pulse{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px}
+.sw{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%}
+#sweep{position:absolute;left:-600px;top:-700px;width:420px;height:2600px;transform-origin:50% 50%;background:linear-gradient(90deg,transparent,rgba(160,235,255,0) 20%,rgba(160,235,255,.55) 50%,rgba(160,235,255,0) 80%,transparent);mix-blend-mode:screen}
+#flash{position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,rgba(200,245,255,1),rgba(63,160,255,.55) 45%,rgba(3,6,15,0) 80%);mix-blend-mode:screen}
+#fade{position:absolute;inset:0;background:#000;z-index:1000}
+.pill{position:absolute;border-radius:999px;display:flex;align-items:center;justify-content:center;font-weight:700;letter-spacing:.14em}
+
+.cursor{position:absolute;width:44px;height:44px;margin:-4px 0 0 -6px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.55));z-index:50}
+.igtile{position:absolute;border-radius:28%;background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fdf497 5%,#fd5949 45%,#d6249f 60%,#285AEB 90%);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.icon2{position:absolute}
+.glass{position:absolute;border-radius:28px;background:linear-gradient(135deg,rgba(120,200,255,.14),rgba(40,90,200,.05));box-shadow:inset 0 0 0 1.5px rgba(140,220,255,.28),0 30px 80px rgba(0,0,0,.45);backdrop-filter:blur(2px)}
+.wave{position:absolute;overflow:visible}
+.hl{position:absolute;border-radius:14px;box-shadow:0 0 0 3px rgba(63,224,255,.95),0 0 40px rgba(63,224,255,.45)}
+
+/* v2: cool graphite device and blue/cyan environment */
+.body{background:linear-gradient(135deg,#46536a 0%,#141922 22%,#07090e 50%,#171d28 78%,#56647a 100%)!important;box-shadow:0 70px 140px rgba(0,0,0,.65),0 20px 40px rgba(0,0,0,.45),inset 0 0 0 1.5px rgba(190,230,255,.28),inset 0 0 0 5px #07090e!important}
+.btn{background:linear-gradient(90deg,#1c222c,#5d6b80)!important}
+.status{color:#EEF6FF}
+.touch{background:rgba(220,248,255,.28)!important;box-shadow:0 0 0 2px rgba(190,240,255,.7),0 0 24px rgba(63,224,255,.45)!important}
+#botc{background:radial-gradient(circle at 40% 35%,#0f2a44,#050b16 72%)!important;box-shadow:0 30px 70px rgba(0,0,0,.6),inset 0 0 0 3px rgba(63,224,255,.65),0 0 80px rgba(47,123,255,.35)!important}
+.line{background:linear-gradient(90deg,rgba(190,245,255,.95),rgba(63,224,255,.85))!important;box-shadow:0 0 16px rgba(63,224,255,.8)!important}
+.caret{background:#9ff0ff!important}
+.vbar{background:linear-gradient(#dffaff,#3fe0ff 55%,rgba(47,123,255,.6))!important}
+#eq i{background:linear-gradient(#dffaff,#3fe0ff 55%,#2f7bff)!important}
+.shadow{background:radial-gradient(ellipse at center,rgba(0,0,0,.75),rgba(0,0,0,0) 70%)!important}
+</style></head>
+<body>
+<div id="stage">
+  <div id="bg" class="abs" style="width:1920px;height:1080px">
+    <div class="blob" id="b0"></div><div class="blob" id="b1"></div><div class="blob" id="b2"></div>
+  </div>
+  <div id="floor" class="abs" style="width:1920px;height:1080px"></div>
+  <canvas id="particles" width="3840" height="2160"></canvas>
+  <div id="cam"></div>
+  <div id="fx" class="abs" style="width:1920px;height:1080px"></div>
+  <div id="texts" class="abs" style="width:1920px;height:1080px"></div>
+  <div id="sweep"></div>
+  <div id="flash"></div>
+  <div id="grain"></div>
+  <div id="vig"></div>
+  <div id="fade"></div>
+</div>
+<script src="compose_v2.js"></script>
+</body></html>

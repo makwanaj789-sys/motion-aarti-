@@ -1,0 +1,957 @@
+{
+ "fps": 30,
+ "duration": 30.4,
+ "scenes": {
+  "hook": 0,
+  "look": 1.6509999999999998,
+  "both": 3.5010000000000003,
+  "mood": 5.151,
+  "search": 8.350000000000001,
+  "play": 10.797,
+  "lists": 12.093,
+  "bot": 14.600000000000001,
+  "themes": 19.145000000000003,
+  "ajay": 22.039,
+  "end": 26.588
+ },
+ "times": {
+  "find": 0.92,
+  "you1": 1.26,
+  "others": 1.791,
+  "you2": 2.371,
+  "looking": 2.681,
+  "aarti": 3.821,
+  "music": 4.201,
+  "does": 4.611,
+  "bothW": 4.851,
+  "fresh": 5.926,
+  "disc": 6.246,
+  "tuned": 7.176,
+  "moodW": 7.666,
+  "or": 8.55,
+  "search": 9.06,
+  "any": 9.36,
+  "song": 9.52,
+  "one": 10.477,
+  "tap": 10.747,
+  "playing": 11.377,
+  "build": 12.593,
+  "playlist": 12.913,
+  "every": 13.673,
+  "moment": 13.953,
+  "keep": 14.88,
+  "favs": 15.25,
+  "sync": 15.97,
+  "aarti2": 16.96,
+  "bot": 17.78,
+  "telegram": 18.3,
+  "make": 19.545,
+  "yours": 19.885,
+  "seven": 20.675,
+  "themes": 21.055,
+  "made": 22.489,
+  "love": 22.969,
+  "ajay": 23.509,
+  "everyone": 24.549,
+  "lives": 25.249,
+  "musicA": 25.739,
+  "endAarti": 27.138,
+  "endMusic": 27.488,
+  "your": 28.158,
+  "sound": 28.618,
+  "igIn": 23.709,
+  "handle": 23.809,
+  "keys1": [
+   2.681,
+   2.8810000000000002
+  ],
+  "keys2": [
+   9.040000000000001,
+   9.200000000000001,
+   9.34,
+   9.459999999999999,
+   9.52
+  ],
+  "submit": 9.719999999999999,
+  "wipes": [
+   19.965,
+   20.2,
+   20.435,
+   20.669999999999998,
+   20.905,
+   21.14,
+   21.375
+  ],
+  "fade": 29.95
+ },
+ "cues": [
+  {
+   "t": 0,
+   "k": "swell"
+  },
+  {
+   "t": 0.57,
+   "k": "rise",
+   "d": 0.35
+  },
+  {
+   "t": 0.92,
+   "k": "card_land"
+  },
+  {
+   "t": 1.651,
+   "k": "pass",
+   "d": 0.45
+  },
+  {
+   "t": 1.851,
+   "k": "card_in"
+  },
+  {
+   "t": 2.371,
+   "k": "click"
+  },
+  {
+   "t": 2.391,
+   "k": "focus"
+  },
+  {
+   "t": 2.681,
+   "k": "key"
+  },
+  {
+   "t": 2.881,
+   "k": "key"
+  },
+  {
+   "t": 3.371,
+   "k": "rise",
+   "d": 0.45
+  },
+  {
+   "t": 3.821,
+   "k": "logo"
+  },
+  {
+   "t": 4.201,
+   "k": "shimmer"
+  },
+  {
+   "t": 4.851,
+   "k": "pulse"
+  },
+  {
+   "t": 5.101,
+   "k": "circle_wipe",
+   "d": 0.5
+  },
+  {
+   "t": 6.596,
+   "k": "pull",
+   "d": 0.7
+  },
+  {
+   "t": 7.176,
+   "k": "click"
+  },
+  {
+   "t": 7.196,
+   "k": "tab"
+  },
+  {
+   "t": 7.666,
+   "k": "click"
+  },
+  {
+   "t": 7.686,
+   "k": "tab"
+  },
+  {
+   "t": 8.57,
+   "k": "click"
+  },
+  {
+   "t": 8.65,
+   "k": "morph",
+   "d": 0.45
+  },
+  {
+   "t": 9.04,
+   "k": "key"
+  },
+  {
+   "t": 9.2,
+   "k": "key"
+  },
+  {
+   "t": 9.34,
+   "k": "key"
+  },
+  {
+   "t": 9.46,
+   "k": "key"
+  },
+  {
+   "t": 9.52,
+   "k": "key"
+  },
+  {
+   "t": 9.36,
+   "k": "select",
+   "d": 0.41000000000000014
+  },
+  {
+   "t": 9.72,
+   "k": "enter"
+  },
+  {
+   "t": 9.78,
+   "k": "card_in",
+   "n": 0
+  },
+  {
+   "t": 9.86,
+   "k": "card_in",
+   "n": 1
+  },
+  {
+   "t": 9.94,
+   "k": "card_in",
+   "n": 2
+  },
+  {
+   "t": 10.477,
+   "k": "hover"
+  },
+  {
+   "t": 10.747,
+   "k": "click"
+  },
+  {
+   "t": 10.777,
+   "k": "tap_pop"
+  },
+  {
+   "t": 10.867,
+   "k": "expand",
+   "d": 0.55
+  },
+  {
+   "t": 11.377,
+   "k": "play"
+  },
+  {
+   "t": 11.407,
+   "k": "drop"
+  },
+  {
+   "t": 12.043,
+   "k": "line",
+   "d": 0.5
+  },
+  {
+   "t": 12.593,
+   "k": "card_in"
+  },
+  {
+   "t": 12.913,
+   "k": "click"
+  },
+  {
+   "t": 12.963,
+   "k": "create"
+  },
+  {
+   "t": 13.263,
+   "k": "flow"
+  },
+  {
+   "t": 13.913,
+   "k": "flow"
+  },
+  {
+   "t": 14.413,
+   "k": "flow"
+  },
+  {
+   "t": 14.6,
+   "k": "pass",
+   "d": 0.4
+  },
+  {
+   "t": 15.25,
+   "k": "click"
+  },
+  {
+   "t": 15.28,
+   "k": "heart"
+  },
+  {
+   "t": 15.97,
+   "k": "swoosh",
+   "d": 0.4
+  },
+  {
+   "t": 16.07,
+   "k": "line",
+   "d": 0.45
+  },
+  {
+   "t": 17.78,
+   "k": "bot"
+  },
+  {
+   "t": 18.4,
+   "k": "line",
+   "d": 0.4
+  },
+  {
+   "t": 18.75,
+   "k": "chime"
+  },
+  {
+   "t": 19.145,
+   "k": "orbit",
+   "d": 0.6
+  },
+  {
+   "t": 19.965,
+   "k": "theme",
+   "n": 0
+  },
+  {
+   "t": 20.2,
+   "k": "theme",
+   "n": 1
+  },
+  {
+   "t": 20.435,
+   "k": "theme",
+   "n": 2
+  },
+  {
+   "t": 20.67,
+   "k": "theme",
+   "n": 3
+  },
+  {
+   "t": 20.905,
+   "k": "theme",
+   "n": 4
+  },
+  {
+   "t": 21.14,
+   "k": "theme",
+   "n": 5
+  },
+  {
+   "t": 21.375,
+   "k": "theme",
+   "n": 6
+  },
+  {
+   "t": 20.675,
+   "k": "tick"
+  },
+  {
+   "t": 21.789,
+   "k": "type_wipe",
+   "d": 0.6
+  },
+  {
+   "t": 22.289,
+   "k": "dip",
+   "d": 0.24999999999999928
+  },
+  {
+   "t": 23.509,
+   "k": "ajay"
+  },
+  {
+   "t": 23.709,
+   "k": "ig"
+  },
+  {
+   "t": 23.859,
+   "k": "tick"
+  },
+  {
+   "t": 26.438,
+   "k": "line",
+   "d": 0.55
+  },
+  {
+   "t": 26.688,
+   "k": "rise",
+   "d": 0.45000000000000073
+  },
+  {
+   "t": 27.138,
+   "k": "logo"
+  },
+  {
+   "t": 27.488,
+   "k": "shimmer"
+  },
+  {
+   "t": 28.158,
+   "k": "key",
+   "soft": 1
+  },
+  {
+   "t": 28.213,
+   "k": "key",
+   "soft": 1
+  },
+  {
+   "t": 28.268,
+   "k": "key",
+   "soft": 1
+  },
+  {
+   "t": 28.323,
+   "k": "key",
+   "soft": 1
+  },
+  {
+   "t": 28.378,
+   "k": "key",
+   "soft": 1
+  },
+  {
+   "t": 28.433,
+   "k": "key",
+   "soft": 1
+  },
+  {
+   "t": 28.488,
+   "k": "key",
+   "soft": 1
+  },
+  {
+   "t": 28.543,
+   "k": "key",
+   "soft": 1
+  },
+  {
+   "t": 28.598,
+   "k": "key",
+   "soft": 1
+  },
+  {
+   "t": 28.653,
+   "k": "key",
+   "soft": 1
+  },
+  {
+   "t": 28.708,
+   "k": "key",
+   "soft": 1
+  },
+  {
+   "t": 28.763,
+   "k": "key",
+   "soft": 1
+  },
+  {
+   "t": 28.818,
+   "k": "key",
+   "soft": 1
+  },
+  {
+   "t": 28.873,
+   "k": "key",
+   "soft": 1
+  },
+  {
+   "t": 28.928,
+   "k": "key",
+   "soft": 1
+  },
+  {
+   "t": 28.983,
+   "k": "key",
+   "soft": 1
+  }
+ ],
+ "vo": {
+  "lines": [
+   {
+    "id": "hook1",
+    "text": "Some songs find you.",
+    "start": 0.18,
+    "end": 1.591,
+    "words": [
+     {
+      "w": "some",
+      "start": 0.18,
+      "end": 0.46
+     },
+     {
+      "w": "songs",
+      "start": 0.46,
+      "end": 0.92
+     },
+     {
+      "w": "find",
+      "start": 0.92,
+      "end": 1.26
+     },
+     {
+      "w": "you",
+      "start": 1.26,
+      "end": 1.58
+     }
+    ],
+    "heard": "samsung's find you",
+    "missing": [
+     "some",
+     "songs"
+    ]
+   },
+   {
+    "id": "hook2",
+    "text": "Others, you go looking for.",
+    "start": 1.791,
+    "end": 3.471,
+    "words": [
+     {
+      "w": "others",
+      "start": 1.791,
+      "end": 2.371
+     },
+     {
+      "w": "you",
+      "start": 2.371,
+      "end": 2.551
+     },
+     {
+      "w": "go",
+      "start": 2.551,
+      "end": 2.681
+     },
+     {
+      "w": "looking",
+      "start": 2.681,
+      "end": 3.041
+     },
+     {
+      "w": "for",
+      "start": 3.041,
+      "end": 3.461
+     }
+    ],
+    "heard": "there is you go looking for",
+    "missing": [
+     "others"
+    ]
+   },
+   {
+    "id": "both",
+    "text": "Aarti Music does both.",
+    "start": 3.821,
+    "end": 5.376,
+    "words": [
+     {
+      "w": "aarti",
+      "start": 3.821,
+      "end": 4.201
+     },
+     {
+      "w": "music",
+      "start": 4.201,
+      "end": 4.611
+     },
+     {
+      "w": "does",
+      "start": 4.611,
+      "end": 4.851
+     },
+     {
+      "w": "both",
+      "start": 4.851,
+      "end": 5.361
+     }
+    ],
+    "heard": "archie music does both",
+    "missing": []
+   },
+   {
+    "id": "mood",
+    "text": "Fresh discoveries, tuned to your mood.",
+    "start": 5.926,
+    "end": 8.15,
+    "words": [
+     {
+      "w": "fresh",
+      "start": 5.926,
+      "end": 6.246
+     },
+     {
+      "w": "discoveries",
+      "start": 6.246,
+      "end": 7.056
+     },
+     {
+      "w": "tuned",
+      "start": 7.176,
+      "end": 7.476
+     },
+     {
+      "w": "to",
+      "start": 7.476,
+      "end": 7.556
+     },
+     {
+      "w": "your",
+      "start": 7.556,
+      "end": 7.666
+     },
+     {
+      "w": "mood",
+      "start": 7.666,
+      "end": 8.136
+     }
+    ],
+    "heard": "fresh discoveries tuned to your mood",
+    "missing": []
+   },
+   {
+    "id": "search",
+    "text": "Or just search any song,",
+    "start": 8.55,
+    "end": 10.017,
+    "words": [
+     {
+      "w": "or",
+      "start": 8.55,
+      "end": 8.71
+     },
+     {
+      "w": "just",
+      "start": 8.71,
+      "end": 9.06
+     },
+     {
+      "w": "search",
+      "start": 9.06,
+      "end": 9.36
+     },
+     {
+      "w": "any",
+      "start": 9.36,
+      "end": 9.52
+     },
+     {
+      "w": "song",
+      "start": 9.52,
+      "end": 10.01
+     }
+    ],
+    "heard": "or just search any song",
+    "missing": []
+   },
+   {
+    "id": "play",
+    "text": "and with one tap, it's playing.",
+    "start": 10.197,
+    "end": 11.943,
+    "words": [
+     {
+      "w": "and",
+      "start": 10.197,
+      "end": 10.337
+     },
+     {
+      "w": "with",
+      "start": 10.337,
+      "end": 10.477
+     },
+     {
+      "w": "one",
+      "start": 10.477,
+      "end": 10.747
+     },
+     {
+      "w": "tap",
+      "start": 10.747,
+      "end": 11.127
+     },
+     {
+      "w": "it's",
+      "start": 11.127,
+      "end": 11.377
+     },
+     {
+      "w": "playing",
+      "start": 11.377,
+      "end": 11.937
+     }
+    ],
+    "heard": "and with one tap it's playing",
+    "missing": []
+   },
+   {
+    "id": "lists",
+    "text": "Build a playlist for every moment.",
+    "start": 12.593,
+    "end": 14.53,
+    "words": [
+     {
+      "w": "build",
+      "start": 12.593,
+      "end": 12.873
+     },
+     {
+      "w": "a",
+      "start": 12.873,
+      "end": 12.913
+     },
+     {
+      "w": "playlist",
+      "start": 12.913,
+      "end": 13.503
+     },
+     {
+      "w": "for",
+      "start": 13.503,
+      "end": 13.673
+     },
+     {
+      "w": "every",
+      "start": 13.673,
+      "end": 13.953
+     },
+     {
+      "w": "moment",
+      "start": 13.953,
+      "end": 14.523
+     }
+    ],
+    "heard": "build a playlist for every moment",
+    "missing": []
+   },
+   {
+    "id": "bot",
+    "text": "Keep your favourites in sync with the Aarti Music bot on Telegram.",
+    "start": 14.88,
+    "end": 18.995,
+    "words": [
+     {
+      "w": "keep",
+      "start": 14.88,
+      "end": 15.13
+     },
+     {
+      "w": "your",
+      "start": 15.13,
+      "end": 15.25
+     },
+     {
+      "w": "favourites",
+      "start": 15.25,
+      "end": 15.83
+     },
+     {
+      "w": "in",
+      "start": 15.83,
+      "end": 15.97
+     },
+     {
+      "w": "sync",
+      "start": 15.97,
+      "end": 16.47
+     },
+     {
+      "w": "with",
+      "start": 16.73,
+      "end": 16.88
+     },
+     {
+      "w": "the",
+      "start": 16.88,
+      "end": 16.96
+     },
+     {
+      "w": "aarti",
+      "start": 16.96,
+      "end": 17.37
+     },
+     {
+      "w": "music",
+      "start": 17.37,
+      "end": 17.78
+     },
+     {
+      "w": "bot",
+      "start": 17.78,
+      "end": 18.1
+     },
+     {
+      "w": "on",
+      "start": 18.1,
+      "end": 18.3
+     },
+     {
+      "w": "telegram",
+      "start": 18.3,
+      "end": 18.98
+     }
+    ],
+    "heard": "keep your favorites in sync with the party music by on telegram",
+    "missing": [
+     "bot"
+    ]
+   },
+   {
+    "id": "themes",
+    "text": "Make it yours, with seven themes.",
+    "start": 19.545,
+    "end": 21.639,
+    "words": [
+     {
+      "w": "make",
+      "start": 19.545,
+      "end": 19.805
+     },
+     {
+      "w": "it",
+      "start": 19.805,
+      "end": 19.885
+     },
+     {
+      "w": "yours",
+      "start": 19.885,
+      "end": 20.445
+     },
+     {
+      "w": "with",
+      "start": 20.445,
+      "end": 20.675
+     },
+     {
+      "w": "seven",
+      "start": 20.675,
+      "end": 21.055
+     },
+     {
+      "w": "themes",
+      "start": 21.055,
+      "end": 21.625
+     }
+    ],
+    "heard": "make it yours with seven teams",
+    "missing": [
+     "themes"
+    ]
+   },
+   {
+    "id": "ajay",
+    "text": "Made with love by Ajay, for everyone who lives through music.",
+    "start": 22.489,
+    "end": 26.338,
+    "words": [
+     {
+      "w": "made",
+      "start": 22.489,
+      "end": 22.789
+     },
+     {
+      "w": "with",
+      "start": 22.789,
+      "end": 22.969
+     },
+     {
+      "w": "love",
+      "start": 22.969,
+      "end": 23.269
+     },
+     {
+      "w": "by",
+      "start": 23.269,
+      "end": 23.509
+     },
+     {
+      "w": "ajay",
+      "start": 23.509,
+      "end": 24.099
+     },
+     {
+      "w": "for",
+      "start": 24.349,
+      "end": 24.549
+     },
+     {
+      "w": "everyone",
+      "start": 24.549,
+      "end": 25.049
+     },
+     {
+      "w": "who",
+      "start": 25.049,
+      "end": 25.249
+     },
+     {
+      "w": "lives",
+      "start": 25.249,
+      "end": 25.529
+     },
+     {
+      "w": "through",
+      "start": 25.529,
+      "end": 25.739
+     },
+     {
+      "w": "music",
+      "start": 25.739,
+      "end": 26.329
+     }
+    ],
+    "heard": "made with love by age eighty for everyone who lives through music",
+    "missing": []
+   },
+   {
+    "id": "end",
+    "text": "Aarti Music. Your daily sound.",
+    "start": 27.138,
+    "end": 29.183,
+    "words": [
+     {
+      "w": "aarti",
+      "start": 27.138,
+      "end": 27.488
+     },
+     {
+      "w": "music",
+      "start": 27.488,
+      "end": 28.068
+     },
+     {
+      "w": "your",
+      "start": 28.158,
+      "end": 28.278
+     },
+     {
+      "w": "daily",
+      "start": 28.278,
+      "end": 28.618
+     },
+     {
+      "w": "sound",
+      "start": 28.618,
+      "end": 29.168
+     }
+    ],
+    "heard": "party music your daily sound",
+    "missing": []
+   }
+  ],
+  "duration": 29.183,
+  "words": 70,
+  "voice": {
+   "af_heart": 0.8,
+   "hf_alpha": 0.2
+  },
+  "speed": 0.88
+ }
+}

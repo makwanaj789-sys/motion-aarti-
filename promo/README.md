@@ -26,3 +26,13 @@ Needs Node with Playwright (Chromium), Python with numpy/scipy/pillow, and ffmpe
 - `audio169.py` builds the soundtrack and sound design from the same cues, ducks the music under
   the voice (with a dynamic cut in the speech band) and masters to -14 LUFS, true peak under -1 dBTP.
 - `qa_voice.py` reports the voice-to-bed ratio per line and speech recognition on the final mix.
+
+## v2.0 (blue, 16:9, creator credit)
+
+    APK=... ./fetch_tts.sh tts && TTS=tts ./build_v2.sh work_v2
+
+- `capture_v2.mjs` recaptures every screen in the app's own "Midnight" (teal) theme, plus 8x macro
+  crops (`MACRO=1`); `capture_themes.mjs` captures Home in all seven themes.
+- `vo2.py` writes the v2 narration (with "Ajay" set phonetically as "uh-JAY") and word times (`vo2.json`).
+- `compose_v2.html` / `compose_v2.js` hold the whole v2 film; `audio_v2.py` the new score, sound design and mix.
+- `render.mjs` supports `RESUME=1` and retries slow frames.

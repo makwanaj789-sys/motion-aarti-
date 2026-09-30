@@ -10,7 +10,7 @@ const [mode, out, ...rest] = process.argv.slice(2);
 fs.mkdirSync(out, { recursive: true });
 const PAGE = process.env.PAGE || 'compose.html';
 const [VW, VH] = (process.env.VIEW || '1080x1920').split('x').map(Number);
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/png', '.jpg': 'image/jpeg', '.json': 'application/json', '.woff2': 'font/woff2' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/png', '.jpg': 'image/jpeg', '.json': 'application/json', '.woff2': 'font/woff2', '.svg': 'image/svg+xml' };
 
 async function newPage(browser) {
   const ctx = await browser.newContext({ viewport: { width: VW, height: VH }, deviceScaleFactor: 2 });
@@ -57,8 +57,15 @@ if (mode === 'stills') {
     const page = await newPage(browser);
     while (next < N) {
       const i = next++;
-      await frameAt(page, i / TL.fps);
-      await page.screenshot({ path: path.join(out, `f${String(i).padStart(4, '0')}.jpg`), type: 'jpeg', quality: 95 });
+      const file = path.join(out, `f${String(i).padStart(4, '0')}.jpg`);
+      if (process.env.RESUME && fs.existsSync(file) && fs.statSync(file).size > 10000) continue;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await frameAt(page, i / TL.fps);
+          await page.screenshot({ path: file, type: 'jpeg', quality: 95, timeout: 180000 });
+          break;
+        } catch (e) { if (attempt >= 2) throw e; console.log('retry frame', i, e.message.split('\n')[0]); }
+      }
       if (i % 30 === 0) console.log(`frame ${i}/${N}  ${((Date.now() - t0) / 1000).toFixed(0)}s`);
     }
   }));
