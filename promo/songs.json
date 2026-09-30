@@ -1,0 +1,39 @@
+{
+ "search": [
+  {"id":"s01","title":"Om Jai Jagdish Hare","artist":"Evening Aarti","cover":0,"duration":342},
+  {"id":"s02","title":"Om Jai Shiv Omkara","artist":"Temple Morning","cover":3,"duration":298},
+  {"id":"s03","title":"Om Jai Lakshmi Mata","artist":"Diya Sessions","cover":8,"duration":276},
+  {"id":"s04","title":"Om Jai Ambe Gauri","artist":"Garba Nights","cover":4,"duration":315},
+  {"id":"s05","title":"Om Namah Shivaya","artist":"Calm Chants","cover":6,"duration":402},
+  {"id":"s06","title":"Om Jai Jagdish Hare (Live)","artist":"Evening Aarti","cover":11,"duration":361}
+ ],
+ "discover": [
+  {"id":"d01","title":"Golden Hour","artist":"Sunset Ragas","cover":0,"duration":214},
+  {"id":"d02","title":"Monsoon Letters","artist":"Lofi Tales","cover":9,"duration":188},
+  {"id":"d03","title":"Garba Raat","artist":"Dandiya Beats","cover":4,"duration":236},
+  {"id":"d04","title":"Neon Diwali","artist":"City Lights","cover":1,"duration":201},
+  {"id":"d05","title":"River Song","artist":"Quiet Waves","cover":5,"duration":247},
+  {"id":"d06","title":"Starlit Bhajan","artist":"Calm Chants","cover":10,"duration":263}
+ ],
+ "playlists": [
+  {"id":"PLdemo0000000001","title":"Morning Aarti","by":"Aarti Music","cover":8},
+  {"id":"PLdemo0000000002","title":"Garba Nights","by":"Dandiya Mix","cover":4},
+  {"id":"PLdemo0000000003","title":"Late Night Lofi","by":"Chill Room","cover":9},
+  {"id":"PLdemo0000000004","title":"Bhakti Classics","by":"Aarti Music","cover":0},
+  {"id":"PLdemo0000000005","title":"Road Trip","by":"Weekend","cover":1}
+ ],
+ "recents": [
+  {"id":"r01","title":"Golden Hour","artist":"Sunset Ragas","cover":0,"duration":214},
+  {"id":"r02","title":"Neon Diwali","artist":"City Lights","cover":1,"duration":201},
+  {"id":"r03","title":"Blue Monsoon","artist":"Lofi Tales","cover":2,"duration":190},
+  {"id":"r04","title":"Violet Sky","artist":"Dream State","cover":3,"duration":222},
+  {"id":"r05","title":"Garba Raat","artist":"Dandiya Beats","cover":4,"duration":236}
+ ],
+ "favs": [
+  {"id":"f01","title":"River Song","artist":"Quiet Waves","cover":5,"duration":247},
+  {"id":"f02","title":"Midnight Ghazal","artist":"Velvet Room","cover":6,"duration":281},
+  {"id":"f03","title":"Rose Petals","artist":"Garden Strings","cover":7,"duration":205},
+  {"id":"f04","title":"Diya","artist":"Evening Aarti","cover":8,"duration":233},
+  {"id":"f05","title":"Starlit Bhajan","artist":"Calm Chants","cover":10,"duration":263}
+ ]
+}
