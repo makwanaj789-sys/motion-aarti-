@@ -1,0 +1,51 @@
+AARTIMUSIC — 16:9 YOUTUBE PROMO
+Final voiceover script
+==============================
+
+Voice: female, warm and clear, with a light Indian-English colour
+       (Kokoro-82M v1.0 neural voice, run locally: 80% af_heart + 20% hf_alpha)
+Brand pronunciation: "Aar-tee Music" (set phonetically as /ˈɑːɹti mjuːzɪk/)
+Length: 59 words, 24.4 s of narration in a 25.7 s film (145 words per minute)
+
+
+TIME     LINE                                                            ON SCREEN
+-------  --------------------------------------------------------------  ------------------------------------
+ 0.18 s  What does your day sound like?                                  WHAT DOES YOUR DAY / SOUND LIKE?
+ 2.07 s  Meet Aarti Music.                                               MEET  AARTIMUSIC (logo lands on "Aarti")
+ 4.05 s  Fresh picks, made for your mood.                                FRESH PICKS / MADE FOR YOUR MOOD
+ 6.40 s  Search any song.                                                SEARCH / ANY SONG.
+ 7.83 s  Find it, tap it, and just press play.                           FIND IT. / TAP IT. / PL [phone] AY
+10.90 s  Build playlists for every mood, and keep your favourites close. PLAYLISTS FOR EVERY MOOD /
+                                                                         KEEP YOUR FAVOURITES CLOSE.
+15.03 s  Connect Telegram, and your favourites follow you to any phone.  CONNECT TELEGRAM /
+                                                                         FAVOURITES THAT FOLLOW YOU / TO ANY PHONE
+19.05 s  Pick from seven themes, and make it yours.                      SEVEN THEMES / MAKE IT YOURS
+22.40 s  Aarti Music. Your daily sound.                                  AARTIMUSIC / Your daily sound (typed)
+                                                                         Android app · @aartimusic_bot on Telegram
+
+Every headline word appears on the word the narrator says it (word timings
+force-aligned from the rendered narration).
+
+
+VERIFIED AARTIMUSIC FEATURES SHOWN
+----------------------------------
+All screens are the real app UI from AartiMusic_1.2.apk, run in Chromium,
+with demo songs and original artwork.
+
+- Home / Discover: "Made for you" mood chips (For you, Trending, Hindi,
+  Gujarati, ...), discovery playlists, "Discover songs", Recently played
+- Search: search field, live suggestions, results list, tapping a song
+- Full-screen player: artwork, progress bar, play/pause, previous/next,
+  shuffle, repeat, "Up next"
+- Your playlists: "Create" -> "A playlist of your own" dialog; new playlist appears
+- Library: Favourites list with saved hearts
+- Telegram: "Connect Telegram" in the library, which links the app to the
+  AartiMusic bot so favourites sync across phones
+  (the app's own copy: "Your favourites will follow you to any phone")
+- Themes: all seven built-in themes (Amber, Grove, Midnight, Violet, Indigo,
+  Neon, Ruby)
+- Brand: launcher logo from the APK, Sora font from the APK, the app's
+  tagline "YOUR DAILY SOUND"
+
+Not claimed: no user counts, ratings, downloads, offline, lyrics, audio
+quality or other unverified claims.

@@ -15,3 +15,14 @@ Renders `output/AartiMusic_Promo_1080x1920.mp4` from the AartiMusic APK.
 6. `build.sh` downscales with Lanczos, encodes H.264 High + AAC, and makes the cover and contact sheet.
 
 Needs Node with Playwright (Chromium), Python with numpy/scipy/pillow, and ffmpeg.
+
+## 16:9 YouTube version with narration
+
+    APK=path/to/AartiMusic_1.2.apk ./fetch_tts.sh tts && TTS=tts ./build169.sh work169
+
+- `vo.py` writes the narration with Kokoro-82M (local ONNX, female voice blend), checks every
+  line with PocketSphinx and force-aligns each word into `vo.json`.
+- `compose169.html` / `compose169.js` anchor every headline and transition to those word times.
+- `audio169.py` builds the soundtrack and sound design from the same cues, ducks the music under
+  the voice (with a dynamic cut in the speech band) and masters to -14 LUFS, true peak under -1 dBTP.
+- `qa_voice.py` reports the voice-to-bed ratio per line and speech recognition on the final mix.

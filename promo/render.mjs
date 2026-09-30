@@ -8,10 +8,12 @@ import path from 'node:path';
 const ROOT = path.dirname(new URL(import.meta.url).pathname);
 const [mode, out, ...rest] = process.argv.slice(2);
 fs.mkdirSync(out, { recursive: true });
+const PAGE = process.env.PAGE || 'compose.html';
+const [VW, VH] = (process.env.VIEW || '1080x1920').split('x').map(Number);
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/png', '.jpg': 'image/jpeg', '.json': 'application/json', '.woff2': 'font/woff2' };
 
 async function newPage(browser) {
-  const ctx = await browser.newContext({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 2 });
+  const ctx = await browser.newContext({ viewport: { width: VW, height: VH }, deviceScaleFactor: 2 });
   await ctx.route('https://promo.local/**', (route) => {
     const f = path.join(ROOT, decodeURIComponent(new URL(route.request().url()).pathname));
     if (!fs.existsSync(f)) return route.fulfill({ status: 404, body: '' });
@@ -19,7 +21,7 @@ async function newPage(browser) {
   });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.error('pageerror', e.message));
-  await page.goto('https://promo.local/compose.html');
+  await page.goto('https://promo.local/' + PAGE);
   await page.waitForFunction(() => window.READY || window.READY_ERR, null, { timeout: 120000 });
   const err = await page.evaluate(() => window.READY_ERR);
   if (err) throw new Error(err);
@@ -41,12 +43,12 @@ if (mode === 'stills') {
     await page.screenshot({ path: path.join(out, `t${(+s).toFixed(2)}.png`) });
     console.log('still', s);
   }
-  fs.writeFileSync(path.join(ROOT, 'timeline.json'), JSON.stringify(await page.evaluate(() => window.TIMELINE), null, 1));
+  fs.writeFileSync(path.join(ROOT, process.env.TLOUT || 'timeline.json'), JSON.stringify(await page.evaluate(() => window.TIMELINE), null, 1));
 } else {
   const workers = +(rest[0] || 4);
   const probe = await newPage(browser);
   const TL = await probe.evaluate(() => window.TIMELINE);
-  fs.writeFileSync(path.join(ROOT, 'timeline.json'), JSON.stringify(TL, null, 1));
+  fs.writeFileSync(path.join(ROOT, process.env.TLOUT || 'timeline.json'), JSON.stringify(TL, null, 1));
   await probe.context().close();
   const N0 = Math.round(TL.duration * TL.fps);
   const N = rest[2] ? Math.min(N0, +rest[2]) : N0;
