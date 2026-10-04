@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>Aarti Music</title>
+<meta name="theme-color" content="#0A0908">
+<!-- Before anything is painted. app.js owns the choice; this only
+     puts it on the element early enough that the splash and the
+     first screen are never briefly the other palette. -->
+<script>try{var t=JSON.parse(localStorage.getItem('aarti.v1')||'{}').theme;
+if(t&&t!=='amber')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="personal.css">
+<link rel="stylesheet" href="themes.css">
+<!-- The two weights on screen before anything is scrolled. The rest
+     are declared in app.css and fetched when something needs them. -->
+<link rel="preload" href="fonts/sora-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/sora-600-latin.woff2" as="font" type="font/woff2" crossorigin>
+
+<style>
+/* The one piece of CSS that cannot wait for app.css. A stylesheet is
+   fetched before the first paint but the WebView's own background is
+   white until then, which is the flash this removes. Everything that
+   moves lives in app.css; this is only what has to be true on the
+   very first frame. */
+html, body { background:#0A0908; margin:0; }
+#boot { position:fixed; inset:0; z-index:999; display:flex;
+        flex-direction:column; align-items:center; justify-content:center;
+        gap:26px; background:#0A0908; pointer-events:none; }
+#boot .boot-mark { display:block; width:min(40vw, 168px); height:auto; }
+</style>
+<link rel="stylesheet" href="capsule.css">
+</head>
+<body>
+
+<!-- The same mark as the launcher icon, on the same black the
+     launch screen uses, so the handover from one to the other is
+     invisible. app.js takes it away once the first screen is ready. -->
+<div id="boot" aria-hidden="true">
+  <div class="boot-equaliser"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <p class="boot-name">Aarti Music</p>
+</div>
+<script>
+(function(){
+  const boot=document.getElementById('boot');
+  const dismiss=()=>{boot.hidden=true;};
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) dismiss();
+  else setTimeout(dismiss,750);
+  // The very first interaction dismisses the visual without consuming the tap.
+  window.addEventListener('pointerdown',dismiss,{capture:true,once:true});
+  window.addEventListener('keydown',dismiss,{capture:true,once:true});
+})();
+</script>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<!-- ============ HOME ============ -->
+<section class="page" id="pHome">
+  <header class="head">
+    <div class="brand-kicker"><img class="brand-icon" src="brand-icon.png" alt="">AARTI MUSIC <span>YOUR DAILY SOUND</span></div>
+    <h1>Good evening</h1>
+    <p id="greetSub">Pick up where you left off</p>
+  </header>
+
+  <section class="block discovery" id="discovery" aria-label="Music discovery"></section>
+
+  <div class="block" id="recentBlock" hidden>
+    <div class="block-head"><h2>Recently played</h2></div>
+    <div class="rail" id="recentRail"></div>
+  </div>
+
+  <div class="block" id="favBlock" hidden>
+    <div class="block-head">
+      <h2>Your favourites</h2>
+      <button class="link" id="playFavs">Shuffle</button>
+    </div>
+    <div class="rows" id="favRows"></div>
+  </div>
+
+  <div class="block" id="plBlock" hidden>
+    <div class="block-head">
+      <h2>Playlists</h2>
+      <button class="link" id="plAdd">Open a link</button>
+    </div>
+    <div class="rail" id="plRail"></div>
+  </div>
+
+  <div class="empty" id="homeEmpty">
+    <div class="art">🎧</div>
+    <h3>Nothing here yet</h3>
+    <p>Search for a song and it will show up here.</p>
+  </div>
+</section>
+
+<!-- ============ SEARCH ============ -->
+<section class="page" id="pSearch" hidden>
+  <header class="head">
+    <form class="searchbar" id="searchForm" autocomplete="off">
+      <input id="q" type="search" placeholder="Songs, artists…" enterkeyhint="search">
+      <button type="submit" aria-label="Search">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      </button>
+    </form>
+  </header>
+
+  <div class="block" id="histBlock" hidden>
+    <div class="block-head">
+      <h2>Recent searches</h2>
+      <button class="link" id="clearHist">Clear</button>
+    </div>
+    <div class="chips" id="histChips"></div>
+  </div>
+
+  <div id="searchSuggestions" class="search-suggestions block" aria-label="Search suggestions" hidden></div>
+  <section class="block discovery" id="searchDiscovery" aria-label="Suggested songs"></section>
+  <div class="rows" id="results"></div>
+
+  <div class="loading" id="loading" hidden aria-hidden="true"><div class="sk-row"><span class="sk sk-art"></span><span class="sk-lines"><span class="sk sk-t"></span><span class="sk sk-s"></span></span></div><div class="sk-row"><span class="sk sk-art"></span><span class="sk-lines"><span class="sk sk-t"></span><span class="sk sk-s"></span></span></div><div class="sk-row"><span class="sk sk-art"></span><span class="sk-lines"><span class="sk sk-t"></span><span class="sk sk-s"></span></span></div><div class="sk-row"><span class="sk sk-art"></span><span class="sk-lines"><span class="sk sk-t"></span><span class="sk sk-s"></span></span></div><div class="sk-row"><span class="sk sk-art"></span><span class="sk-lines"><span class="sk sk-t"></span><span class="sk sk-s"></span></span></div><div class="sk-row"><span class="sk sk-art"></span><span class="sk-lines"><span class="sk sk-t"></span><span class="sk sk-s"></span></span></div></div>
+  <div class="empty" id="searchEmpty">
+    <div class="art">🔍</div>
+    <h3>Search any song</h3>
+    <p>Everything the bot can find, it can play here.</p>
+  </div>
+</section>
+
+<!-- ============ PLAYLISTS ============ -->
+<section class="page" id="pLists" hidden>
+  <header class="head">
+    <form class="searchbar" id="listForm" autocomplete="off">
+      <input id="lq" type="search" placeholder="Playlists on YouTube…" enterkeyhint="search">
+      <button type="submit" aria-label="Search playlists">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      </button>
+    </form>
+  </header>
+
+  <!-- Somewhere to start, so the screen is never just a box. -->
+  <div class="block" id="lqBlock">
+    <div class="block-head">
+      <h2>Try</h2>
+      <button class="link" id="lqAdd">Open a link</button>
+    </div>
+    <div class="chips" id="lqChips"></div>
+  </div>
+
+  <div class="block" id="lqMineBlock" hidden>
+    <div class="block-head"><h2>Opened before</h2></div>
+    <div class="tiles" id="lqMine"></div>
+  </div>
+
+  <section class="block discovery" id="listDiscovery" aria-label="Suggested playlists"></section>
+  <div class="tiles" id="lqResults"></div>
+
+  <div class="loading" id="lqLoading" hidden aria-hidden="true"><div class="sk-tile"><span class="sk sk-cover"></span><span class="sk sk-t"></span><span class="sk sk-s"></span></div><div class="sk-tile"><span class="sk sk-cover"></span><span class="sk sk-t"></span><span class="sk sk-s"></span></div><div class="sk-tile"><span class="sk sk-cover"></span><span class="sk sk-t"></span><span class="sk sk-s"></span></div><div class="sk-tile"><span class="sk sk-cover"></span><span class="sk sk-t"></span><span class="sk sk-s"></span></div><div class="sk-tile"><span class="sk sk-cover"></span><span class="sk sk-t"></span><span class="sk sk-s"></span></div><div class="sk-tile"><span class="sk sk-cover"></span><span class="sk sk-t"></span><span class="sk sk-s"></span></div></div>
+
+  <div class="empty" id="lqEmpty" hidden>
+    <div class="art">📼</div>
+    <h3>No playlists for that</h3>
+    <p>Try a shorter word, or paste a playlist link.</p>
+  </div>
+</section>
+
+<!-- ============ LIBRARY ============ -->
+<section class="page" id="pLib" hidden>
+  <header class="head"><h1>Your library</h1></header>
+
+  <div class="account" id="account">
+    <span class="acc-dot" id="accDot" aria-hidden="true"></span>
+    <div class="acc-text">
+      <div class="acc-state" id="accState">Saved on this phone</div>
+      <div class="acc-sub" id="accSub">Connect Telegram to keep these if you change phones</div>
+    </div>
+    <button class="acc-btn" id="accBtn">Connect</button>
+  </div>
+
+  <!-- A theme is a palette on :root and nothing more, so this only
+       writes one attribute. The swatches keep their own colours in
+       either theme — a chooser that changes colour with the choice
+       tells you nothing about what you are choosing. -->
+  <div class="themes" role="group" aria-label="Theme">
+    <span class="th-label">Theme</span>
+    <button class="th th-amber" data-theme="amber" aria-pressed="true">
+      <i aria-hidden="true"></i><span>Amber</span>
+    </button>
+    <button class="th th-green" data-theme="green" aria-pressed="false">
+      <i aria-hidden="true"></i><span>Grove</span>
+    </button>
+  </div>
+
+  <section class="block" id="ownPlaylists"><div class="block-head"><h2>Your playlists</h2><button class="link" id="createPlaylist">Create</button></div><div class="own-grid" id="ownGrid"></div><p id="ownEmpty" class="personal-status">Make a playlist for your own kind of mood.</p></section>
+  <div class="seg">
+    <button class="on" data-lib="favs">Favourites</button>
+    <button data-lib="recents">History</button>
+  </div>
+
+  <!-- Finding something in a long library without scrolling it. -->
+  <div class="find">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+    <input id="libFind" type="search" inputmode="search" autocomplete="off"
+           placeholder="Find in your library" aria-label="Find in your library">
+    <button id="libFindClear" class="find-x" aria-label="Clear" hidden>
+      <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+
+  <div class="rows" id="libRows"></div>
+  <div class="empty" id="libEmpty" hidden>
+    <div class="art">🤍</div>
+    <h3>Nothing saved</h3>
+    <p>Tap the heart on any song to keep it here.</p>
+  </div>
+
+  <!-- Whose app this is. Both open outside; the click handler in
+       app.js tries the app's own scheme before the web page. -->
+  <footer class="made">
+    <span class="made-by">Made by</span>
+    <div class="handles">
+      <a class="handle" data-press href="https://instagram.com/h81t6"
+         data-app="instagram://user?username=h81t6" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="3" y="3" width="18" height="18" rx="5.2"/>
+          <circle cx="12" cy="12" r="4.1"/>
+          <circle class="dot" cx="17.3" cy="6.7" r="1.15"/>
+        </svg>
+        <span>@h81t6</span>
+      </a>
+      <a class="handle" data-press href="https://t.me/umclon"
+         data-app="tg://resolve?domain=umclon" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path class="solid" d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/>
+        </svg>
+        <span>@umclon</span>
+      </a>
+    </div>
+  </footer>
+</section>
+
+<!-- ============ MINI PLAYER ============ -->
+<div class="mini" id="mini" hidden>
+  <div class="bar"><i id="miniFill"><span class="fill-in"><span class="shimmer"></span></span></i></div>
+  <div class="mini-in" id="miniIn">
+    <span id="mArt" aria-hidden="true"></span>
+    <div class="meta" id="miniOpen">
+      <div class="t" id="mTitle"></div>
+      <div class="a" id="mArtist"></div>
+      <!-- Shown in place of the artist only when the sound is going
+           somewhere other than the phone's own speaker, which is the
+           part worth saying. -->
+      <div class="out" id="mOut" hidden><svg class="out-i" viewBox="0 0 24 24" aria-hidden="true"><path class="bt" d="M8 6.5L16 17.5 12 21V3l4 3.5L8 17.5"/><path class="wire" d="M4 14v-2a8 8 0 0116 0v2"/><path class="wire" d="M4 14h3v5H5a1 1 0 01-1-1zM20 14h-3v5h2a1 1 0 001-1z"/><path class="spk" d="M4 9h3l5-4v14l-5-4H4z"/><path class="spk" d="M16 9.5a4 4 0 010 5"/></svg><span id="mOutName"></span></div>
+    </div>
+    <button id="mFav" class="icon" aria-label="Favourite">
+      <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.5-7-9a4 4 0 017-2.6A4 4 0 0119 11c0 4.5-7 9-7 9z"/></svg>
+    </button>
+    <button id="mPlay" class="play" aria-label="Play">
+      <svg class="morph" viewBox="0 0 24 24" aria-hidden="true">
+        <path class="mp l" d="M7 4.2L13.2 8L13.2 16L7 19.8Z"/>
+        <path class="mp r" d="M13.2 8L19.6 11.8L19.6 12.2L13.2 16Z"/>
+      </svg>
+      <span class="spin"></span>
+    </button>
+  </div>
+</div>
+
+<!-- ============ BOTTOM NAV ============ -->
+<nav class="nav" id="nav">
+  <button class="on" data-tab="Home">
+    <svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7"/><path d="M6 10v9h12v-9"/></svg>
+    <span>Home</span>
+  </button>
+  <button data-tab="Search">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+    <span>Search</span>
+  </button>
+  <button data-tab="Lists">
+    <svg viewBox="0 0 24 24"><path d="M4 7h11M4 12h11M4 17h7"/><path d="M17 10v7.2"/><circle cx="19" cy="17.6" r="2.4"/></svg>
+    <span>Playlists</span>
+  </button>
+  <button data-tab="Lib">
+    <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.5-7-9a4 4 0 017-2.6A4 4 0 0119 11c0 4.5-7 9-7 9z"/></svg>
+    <span>Library</span>
+  </button>
+</nav>
+
+<div id="sharedArt"><div id="coverSwipe"><img id="nArt" alt="Now playing artwork" draggable="false"></div></div>
+
+<!-- ============ FULL SCREEN ============ -->
+<section class="now" id="now" aria-hidden="true">
+  <div class="now-surface" aria-hidden="true"></div>
+  <div class="now-bg" id="nowBg"></div>
+  <!-- The pool of light the artwork throws into the room. Its colour
+       comes from the cover; only its opacity and scale ever move. -->
+  <div class="now-lit" id="nowLit" aria-hidden="true"></div>
+  <div class="now-in">
+    <header class="now-top">
+      <button id="nowClose" aria-label="Close">
+        <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <span class="from" id="nowFrom">Now playing</span>
+      <button id="nowMenu" aria-label="More">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/></svg>
+      </button>
+    </header>
+
+    <!-- The wrapper is what the gesture listens through; the img
+         underneath keeps breathing. -->
+    <div class="cover"><div id="fullArtSlot" aria-hidden="true"></div></div>
+
+    <div class="now-meta">
+      <div class="nm-text">
+        <h1 id="nTitle"></h1>
+        <p id="nArtist"></p>
+      </div>
+      <button id="nFav" class="icon big" aria-label="Favourite">
+        <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.5-7-9a4 4 0 017-2.6A4 4 0 0119 11c0 4.5-7 9-7 9z"/></svg>
+      </button>
+    </div>
+
+    <div class="out-row" id="nOut" hidden><svg class="out-i" viewBox="0 0 24 24" aria-hidden="true"><path class="bt" d="M8 6.5L16 17.5 12 21V3l4 3.5L8 17.5"/><path class="wire" d="M4 14v-2a8 8 0 0116 0v2"/><path class="wire" d="M4 14h3v5H5a1 1 0 01-1-1zM20 14h-3v5h2a1 1 0 001-1z"/><path class="spk" d="M4 9h3l5-4v14l-5-4H4z"/><path class="spk" d="M16 9.5a4 4 0 010 5"/></svg><span id="nOutName"></span></div>
+
+    <div class="seek">
+      <div class="seek-rail" id="seekRail"><i id="seekFill"><span class="fill-in"><span class="shimmer"></span></span></i><span class="knob-track"><b id="seekKnob"></b></span></div>
+      <div class="times"><span id="nCur">0:00</span><span id="nDur">0:00</span></div>
+    </div>
+
+    <div class="now-ctrls">
+      <button id="bShuffle" class="small" aria-label="Shuffle">
+        <svg viewBox="0 0 24 24"><path d="M16 4l4 3-4 3"/><path d="M16 14l4 3-4 3"/><path d="M4 7h4l8 10h4"/><path d="M4 17h4l2-2.5"/></svg>
+      </button>
+      <button id="nPrev" aria-label="Previous">
+        <svg viewBox="0 0 24 24"><path d="M18 5v14L8 12zM6 5h2v14H6z"/></svg>
+      </button>
+      <button id="nPlay" class="play" aria-label="Play">
+        <svg class="morph" viewBox="0 0 24 24" aria-hidden="true">
+          <path class="mp l" d="M7 4.2L13.2 8L13.2 16L7 19.8Z"/>
+          <path class="mp r" d="M13.2 8L19.6 11.8L19.6 12.2L13.2 16Z"/>
+        </svg>
+        <span class="spin"></span>
+      </button>
+      <button id="nNext" aria-label="Next">
+        <svg viewBox="0 0 24 24"><path d="M6 5v14l10-7zM16 5h2v14h-2z"/></svg>
+      </button>
+      <button id="bRepeat" class="small" aria-label="Repeat">
+        <svg viewBox="0 0 24 24"><path d="M17 3l3 3-3 3"/><path d="M20 6H8a4 4 0 00-4 4v1"/><path d="M7 21l-3-3 3-3"/><path d="M4 18h12a4 4 0 004-4v-1"/></svg>
+        <b class="one" hidden>1</b>
+      </button>
+    </div>
+
+    <button class="queue-open" id="queueOpen">
+      <svg viewBox="0 0 24 24"><path d="M4 7h10M4 12h10M4 17h7"/><path d="M17 8l3 4-3 4"/></svg>
+      <span id="upNextLabel">Queue</span>
+    </button>
+  </div>
+</section>
+
+<!-- ============ QUEUE ============ -->
+<section class="sheet" id="queueSheet" aria-hidden="true">
+  <div class="sheet-in">
+    <div class="grab"></div>
+    <div class="sheet-head">
+      <h2>Queue</h2>
+      <button class="link" id="queueClose">Done</button>
+    </div>
+    <div class="rows" id="queueRows"></div>
+  </div>
+</section>
+
+<!-- ============ ACTIONS ============ -->
+<section class="sheet" id="actionSheet" aria-hidden="true">
+  <div class="sheet-in">
+    <div class="grab"></div>
+    <div class="sheet-song" id="actSong"></div>
+    <button class="act" data-act="playlist">Add to your playlist</button>
+    <button class="act" data-act="next">Play next</button>
+    <button class="act" data-act="queue">Add to queue</button>
+    <button class="act" data-act="fav" id="actFav">Add to favourites</button>
+    <button class="act ghost" data-act="close">Cancel</button>
+  </div>
+</section>
+
+<!-- ============ SLEEP TIMER ============ -->
+<section class="sheet" id="sleepSheet" aria-hidden="true">
+  <div class="sheet-in">
+    <div class="grab"></div>
+    <div class="sheet-head"><h2>Sleep timer</h2></div>
+    <button class="act" data-sleep="15">15 minutes</button>
+    <button class="act" data-sleep="30">30 minutes</button>
+    <button class="act" data-sleep="60">1 hour</button>
+    <button class="act" data-sleep="track">End of this track</button>
+    <button class="act ghost" data-sleep="0">Turn off</button>
+  </div>
+</section>
+
+<!-- ============ CONNECT TELEGRAM ============ -->
+<section class="sheet" id="linkSheet" aria-hidden="true">
+  <div class="sheet-in">
+    <div class="grab"></div>
+    <div class="sheet-head"><h2 id="linkTitle">Connect Telegram</h2></div>
+    <p class="link-copy" id="linkCopy">Your favourites will follow you to any phone, and match what the bot already knows.</p>
+    <div class="link-wait" id="linkWait" hidden><span></span><span></span><span></span></div>
+    <button class="act" id="linkGo">Open Telegram</button>
+    <button class="act ghost" id="linkAlt" hidden>Telegram didn't open — copy the link</button>
+    <button class="act ghost" id="linkCancel">Not now</button>
+  </div>
+</section>
+
+<!-- ============ A PLAYLIST ============
+     Comes up over everything like the full-screen player, and is
+     closed the same ways: the button, a drag down, or Back. -->
+<section class="now plist" id="plist" aria-hidden="true">
+  <div class="now-bg" id="plBg"></div>
+  <div class="now-in">
+    <header class="now-top">
+      <button id="plClose" aria-label="Close">
+        <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <span class="from">Playlist</span>
+      <span class="now-top-spacer" aria-hidden="true"></span>
+    </header>
+
+    <div class="pl-head">
+      <img id="plArt" alt="">
+      <div class="pl-text">
+        <h1 id="plTitle">Playlist</h1>
+        <p id="plBy"></p>
+      </div>
+    </div>
+
+    <div class="pl-acts">
+      <button class="act-solid" id="plPlay">
+        <svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg>
+        <span>Play all</span>
+      </button>
+      <button class="act-ghost" id="plShuffle">
+        <svg viewBox="0 0 24 24"><path d="M16 4l4 3-4 3"/><path d="M16 14l4 3-4 3"/><path d="M4 7h4l8 10h4"/><path d="M4 17h4l2-2.5"/></svg>
+        <span>Shuffle</span>
+      </button>
+    </div>
+
+    <div class="rows pl-rows" id="plRows"></div>
+    <div class="loading" id="plLoading" hidden><span></span><span></span><span></span></div>
+    <div class="empty" id="plEmpty" hidden>
+      <div class="art">📃</div>
+      <h3>Nothing in here</h3>
+      <p>That playlist came back empty.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Pasting a link to one -->
+<section class="sheet" id="plSheet" aria-hidden="true">
+  <div class="sheet-in">
+    <div class="grab"></div>
+    <div class="sheet-head"><h2>Open a playlist</h2></div>
+    <p class="link-copy">Paste a YouTube playlist link. Anything with a list in it works.</p>
+    <!-- Deliberately not type="url": a bare list id is perfectly good
+         input here, and the browser's own validation would refuse it
+         without ever firing submit. What counts as a playlist is
+         decided in app.js, where the message can say something. -->
+    <form id="plForm" class="pl-form" novalidate>
+      <input id="plInput" type="text" inputmode="url" autocomplete="off"
+             placeholder="youtube.com/playlist?list=…" aria-label="Playlist link">
+      <button class="act" type="submit">Open it</button>
+    </form>
+    <button class="act ghost" id="plCancel" type="button">Not now</button>
+  </div>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<audio id="audio" preload="none"></audio>
+<script src="config.js"></script>
+<script src="playlists.js"></script>
+<script src="discovery.js"></script>
+<script src="player-motion.js"></script>
+<script src="profile.js"></script>
+<script src="backup.js"></script>
+<script src="personal-library.js"></script>
+<script src="app.js"></script>
+<script src="capsule.js"></script>
+</body>
+</html>

@@ -1,0 +1,2422 @@
+/* ============================================================
+   AARTI MUSIC
+   ============================================================ */
+(function () {
+  "use strict";
+
+  const tg = window.Telegram && window.Telegram.WebApp;
+  if (tg) {
+    tg.ready(); tg.expand();
+    try { tg.setHeaderColor("#0A0908"); tg.setBackgroundColor("#0A0908"); } catch (e) {}
+  }
+
+  const INIT = (tg && tg.initData) || "";
+  const DEV_KEY = window.AARTI_KEY || "";
+
+  let SERVER = window.AARTI_SERVER || "";
+  let found = false;
+
+  const $ = (id) => document.getElementById(id);
+  const audio = $("audio");
+
+  /* ---------- what the app remembers ------------------------
+     Kept on the phone, not the server: favourites, history and
+     what was playing last. The backend only knows how to search
+     and how to stream, and keeping it that way means none of
+     this depends on being signed in to anything.            */
+
+  const KEY = "aarti.v1";
+  const store = {
+    favs: [], recents: [], history: [], repeat: "off", shuffle: false,
+    /* Removals are remembered, not just applied. Without a record
+       that a song was un-favourited, the next sync sees it missing
+       locally, present on the server, and helpfully puts it back —
+       the classic deleted-thing-returns bug. id -> removal time. */
+    gone: {},
+    link: null,          // { token, userId, name } once connected
+    syncedAt: 0,
+    /* Playlists that have been opened, newest first, so the home
+       screen fills itself with what is actually listened to rather
+       than staying empty until someone edits config.js. */
+    lists: [],
+    /* Which palette. "amber" is what :root already is, so it is
+       stored as the absence of an attribute rather than one that
+       has to be kept in step with the stylesheet. */
+    theme: "amber",
+  };
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) Object.assign(store, JSON.parse(raw));
+    } catch (e) {}
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {}
+  }
+  load();
+
+  /* ---------- state ----------------------------------------- */
+
+  let queue = [];        // what plays next, in order
+  let index = -1;
+  let results = [];      // last search, shown on the Search tab
+  let token = 0;         // guards against two plays racing
+  let sleepAt = 0;       // timestamp, or -1 for "end of this track"
+  let actionSong = null;
+
+  const headers = () => {
+    const h = {};
+    if (INIT) h["X-Init-Data"] = INIT;
+    if (DEV_KEY) h["X-Dev-Key"] = DEV_KEY;
+    return h;
+  };
+
+  const time = (s) => {
+    if (!s || !isFinite(s)) return "0:00";
+    const m = Math.floor(s / 60);
+    return m + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+  };
+
+  const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- haptics ---------------------------------------
+     Telegram's bridge where there is one; silence everywhere
+     else. Every call is wrapped because the bridge exists but
+     throws on desktop clients that have no haptic hardware. */
+  const buzz = (k) => {
+    try { tg.HapticFeedback.impactOccurred(k || "light"); } catch (e) {}
+  };
+  const buzzDone = (type) => {
+    try { tg.HapticFeedback.notificationOccurred(type || "success"); } catch (e) {}
+  };
+  const buzzPick = () => {
+    try { tg.HapticFeedback.selectionChanged(); } catch (e) {}
+  };
+
+  /* ---------- press and ripple ------------------------------
+     Delegated, so anything added to the DOM later is covered
+     without being registered. Everything here is decoration: it
+     runs on pointerdown, after the browser has already decided
+     which element the tap belongs to, and the ripple lives in a
+     pointer-events:none layer inside the target. A second tap
+     during an animation hits the element, not the ripple. */
+  const PRESSABLE = "button,.row,.card,.chip,.act,.queue-open,[data-press]";
+
+  function ripple(el, e) {
+    if (REDUCED) return;
+    let layer = el.querySelector(":scope > .rip-layer");
+    if (!layer) {
+      layer = document.createElement("span");
+      layer.className = "rip-layer";
+      el.appendChild(layer);
+    }
+    const box = el.getBoundingClientRect();
+    const size = Math.max(box.width, box.height) * 2.1;
+    const dot = document.createElement("span");
+    dot.className = "rip";
+    dot.style.setProperty("--r", size + "px");
+    dot.style.setProperty("--x", ((e.clientX || box.left + box.width / 2) - box.left) + "px");
+    dot.style.setProperty("--y", ((e.clientY || box.top + box.height / 2) - box.top) + "px");
+    layer.appendChild(dot);
+    dot.addEventListener("animationend", () => dot.remove(), { once: true });
+    // A dropped animationend (backgrounded tab, mid-flight removal)
+    // would otherwise leave the node behind for good.
+    setTimeout(() => dot.remove(), 900);
+  }
+
+  let pressed = null;
+  const release = () => {
+    if (pressed) pressed.classList.remove("pressing");
+    pressed = null;
+  };
+
+  document.addEventListener("pointerdown", (e) => {
+    const el = e.target.closest && e.target.closest(PRESSABLE);
+    if (!el || el.disabled) return;
+    el.classList.add("pressable", "pressing");
+    pressed = el;
+    ripple(el, e);
+  }, { passive: true });
+
+  ["pointerup", "pointercancel", "pointerleave"].forEach((ev) =>
+    document.addEventListener(ev, release, { passive: true })
+  );
+  // Scrolling away from a press should let go of it too.
+  document.addEventListener("scroll", release, { passive: true, capture: true });
+  /* Window-level blur only. A capture-phase blur listener fires
+     whenever focus moves between elements — including the blur the
+     press itself causes — which cancelled every press the moment
+     it started. */
+  window.addEventListener("blur", release);
+
+  let toastTimer;
+  function toast(msg) {
+    const t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 1900);
+  }
+
+  /* ---------- finding the server ---------------------------- */
+
+  async function findServer(force) {
+    if (!window.AARTI_DISCOVERY) return;
+    if (found && !force) return;
+    try {
+      const r = await fetch(window.AARTI_DISCOVERY + "?t=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) return;
+      const j = await r.json();
+      if (j && j.server) { SERVER = j.server.replace(/\/$/, ""); found = true; }
+    } catch (e) {
+      // offline, or the file isn't there — carry on with what was
+      // built in rather than refusing to start
+    }
+  }
+  const ready = findServer();
+
+  async function api(path) {
+    await ready;
+    try {
+      return await fetch(SERVER + path, { headers: headers() });
+    } catch (first) {
+      // The server has most likely moved since the app opened.
+      await findServer(true);
+      return await fetch(SERVER + path, { headers: headers() });
+    }
+  }
+
+  /* ---------- tabs ------------------------------------------ */
+
+  const pages = { Home: $("pHome"), Search: $("pSearch"),
+                  Lists: $("pLists"), Lib: $("pLib") };
+
+  let currentTab = "Home";
+  function tab(name) {
+    const direction = Object.keys(pages).indexOf(name)>=Object.keys(pages).indexOf(currentTab)?1:-1;
+    const changed = currentTab !== name; currentTab=name;
+    Object.entries(pages).forEach(([k, el]) => (el.hidden = k !== name));
+    [...$("nav").children].forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
+    if (name === "Home") drawHome();
+    if (name === "Lib") drawLib();
+    if (name === "Search") drawHistory();
+    if (name === "Lists") drawFinder();
+    window.scrollTo(0, 0);
+    if (changed && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      pages[name].getAnimations().forEach(a=>a.cancel());
+      pages[name].animate([{opacity:.35,transform:`translate3d(${direction*20}px,12px,0) scale(.985)`},{opacity:1,transform:'none'}],{duration:260,easing:'cubic-bezier(.2,.8,.2,1)'});
+    }
+    if(name==='Search') { $('searchEmpty').hidden=true; searchDiscovery.refresh(); }
+    if(name==='Lists') listDiscovery.refresh();
+  }
+  [...$("nav").children].forEach((b) =>
+    b.addEventListener("click", () => { buzzPick(); tab(b.dataset.tab); })
+  );
+
+  /* ---------- the palette -----------------------------------
+     Amber and Grove. A theme is eight custom properties on :root,
+     so switching one is one attribute and a repaint — there is no
+     second stylesheet to load and nothing to keep in step.
+
+     Amber is what :root is without the attribute, which is what
+     makes it the one that cannot be got wrong.                */
+
+  const THEMES = AartiBackup.themes;
+
+  function paintTheme() {
+    const t = THEMES.indexOf(store.theme) >= 0 ? store.theme : "amber";
+    const root = document.documentElement;
+    if (t === "amber") root.removeAttribute("data-theme");
+    else root.setAttribute("data-theme", t);
+
+    // The status bar and the notch area, which Android paints from
+    // this and not from the page.
+    const meta = document.querySelector('meta[name="theme-color"]');
+    const bg = getComputedStyle(root).getPropertyValue("--bg").trim();
+    if (meta && bg) meta.setAttribute("content", bg);
+    try { tg.setHeaderColor(bg); tg.setBackgroundColor(bg); } catch (e) {}
+
+    document.querySelectorAll(".th").forEach((b) =>
+      b.setAttribute("aria-pressed", b.dataset.theme === t ? "true" : "false"));
+
+    // The pool of light under the cover is the artwork's colour when
+    // there is one and the palette's when there is not, so it has to
+    // be asked again.
+    relight(queue[index]);
+  }
+
+  document.addEventListener("click", e => {
+    const b=e.target.closest('.th[data-theme]');if(!b||!THEMES.includes(b.dataset.theme))return;
+    store.theme=b.dataset.theme;save();buzzPick();paintTheme();
+  });
+
+  paintTheme();
+
+  /* ---------- rows ------------------------------------------ */
+
+  const isFav = (id) => store.favs.some((s) => s.id === id);
+
+  /* ---------- the heart -------------------------------------
+     Filling one is the single most satisfying thing in the app,
+     so it gets a pop and a burst. Emptying one does not — an
+     undo should feel quieter than the thing it undoes.
+
+     Only a real tap pops. paintFavButtons runs on every track
+     change too, and popping there would fire the burst every time
+     a song that happens to be a favourite comes on. */
+  function sparkle(btn) {
+    if (REDUCED) return;
+    let layer = btn.querySelector(":scope > .spark-layer");
+    if (!layer) {
+      layer = document.createElement("span");
+      layer.className = "spark-layer";
+      btn.appendChild(layer);
+    }
+    for (let i = 0; i < 7; i++) {
+      const dot = document.createElement("i");
+      dot.className = "spark";
+      dot.style.setProperty("--a", (i * (360 / 7) + Math.random() * 18) + "deg");
+      dot.style.setProperty("--d", (13 + Math.random() * 9).toFixed(1) + "px");
+      dot.style.animationDelay = (Math.random() * 40).toFixed(0) + "ms";
+      layer.appendChild(dot);
+      dot.addEventListener("animationend", () => dot.remove(), { once: true });
+      setTimeout(() => dot.remove(), 1100);
+    }
+  }
+
+  function markFav(btn, on, pop) {
+    if (!btn) return;
+    btn.classList.toggle("fav", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    if (!pop || !on) return;
+    btn.classList.remove("popping");
+    void btn.offsetWidth;                 // restart the animation mid-flight
+    btn.classList.add("popping");
+    sparkle(btn);
+  }
+
+  function heart(song) {
+    const b = document.createElement("button");
+    b.className = "icon" + (isFav(song.id) ? " fav" : "");
+    b.setAttribute("aria-label", "Favourite");
+    b.setAttribute("aria-pressed", isFav(song.id) ? "true" : "false");
+    b.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.5-7-9a4 4 0 017-2.6A4 4 0 0119 11c0 4.5-7 9-7 9z"/></svg>';
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleFav(song);
+      markFav(b, isFav(song.id), true);
+    });
+    return b;
+  }
+
+  function rowFor(song, list, i) {
+    const row = document.createElement("div");
+    row.className = "row";
+    if (queue[index] && queue[index].id === song.id) row.classList.add("on");
+
+    const img = document.createElement("img");
+    img.loading = "lazy"; img.src = song.thumb;
+
+    /* Sits over the artwork and only shows on the playing row, so
+       the list says which track is live without a second column
+       that is empty for every other row. */
+    const eq = document.createElement("span");
+    eq.className = "eq";
+    eq.setAttribute("aria-hidden", "true");
+    eq.innerHTML = "<i></i><i></i><i></i><i></i>";
+
+    const info = document.createElement("div");
+    info.className = "info";
+    const t = document.createElement("div");
+    t.className = "title";
+    t.textContent = song.title;                 // arbitrary text — never innerHTML
+    const s = document.createElement("div");
+    s.className = "sub";
+    s.textContent = song.artist || "Unknown";
+    info.append(t, s);
+
+    const more = document.createElement("button");
+    more.className = "icon";
+    more.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/></svg>';
+    more.addEventListener("click", (e) => { e.stopPropagation(); openActions(song); });
+
+    row.append(img, eq, info, heart(song), more);
+
+    const play = () => chooseSong(list, i);
+    img.addEventListener("click", play);
+    info.addEventListener("click", play);
+
+    return row;
+  }
+
+  /* Rows arrive one after another rather than all at once. The
+     delay is capped, because a 30-row library staggered at the
+     full rate would still be arriving a second later.
+
+     The class is stripped once the animation ends. animation-fill-
+     mode:both keeps the final transform applied, and an applied
+     transform outranks the press-scale — leaving it on would mean
+     a row could never be pressed again. */
+  function stagger(row, i) {
+    if (REDUCED) return row;
+    row.style.setProperty("--i", Math.min(i, 12));
+    row.classList.add("stagger");
+    row.addEventListener("animationend", function done(e) {
+      if (e.animationName !== "rowIn") return;
+      row.classList.remove("stagger");
+      row.style.removeProperty("--i");
+      row.removeEventListener("animationend", done);
+    });
+    return row;
+  }
+
+  function fill(box, list) {
+    box.innerHTML = "";
+    list.forEach((song, i) => box.appendChild(stagger(rowFor(song, list, i), i)));
+  }
+
+  /* ---------- home ------------------------------------------ */
+
+  function drawHome() {
+    const hour = new Date().getHours();
+    $("pHome").querySelector("h1").textContent =
+      (hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening") + (AartiProfile.get() ? ", " + AartiProfile.get().name : "");
+
+    const hasRecent = store.recents.length > 0;
+    const hasFavs = store.favs.length > 0;
+
+    drawLists();
+    discovery.refresh();
+    const hasLists = !$("plBlock").hidden;
+
+    $("recentBlock").hidden = !hasRecent;
+    $("favBlock").hidden = !hasFavs;
+    $("homeEmpty").hidden = true;
+    $("greetSub").textContent = hasRecent ? "Pick up where you left off" : "Let's find something";
+
+    const rail = $("recentRail");
+    rail.innerHTML = "";
+    store.recents.slice(0, 12).forEach((song, i) => {
+      const card = document.createElement("div");
+      card.className = "card";
+      const img = document.createElement("img");
+      img.loading = "lazy"; img.src = song.thumb;
+      const t = document.createElement("div");
+      t.className = "t"; t.textContent = song.title;
+      card.append(img, t);
+      stagger(card, i);
+      card.addEventListener("click", () => {
+        chooseSong(store.recents, i);
+      });
+      rail.appendChild(card);
+    });
+
+    fill($("favRows"), store.favs.slice(0, 6));
+  }
+
+  $("playFavs").addEventListener("click", () => {
+    if (!store.favs.length) return;
+    queue = shuffled(store.favs);
+    store.shuffle = true; save(); paintModes();
+    playAt(0);
+  });
+
+  /* ---------- search ---------------------------------------- */
+
+  $("searchForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const term = $("q").value.trim();
+    if (!term) return;
+    search(term);
+  });
+
+  async function search(term) {
+    hideSuggestions(); $("searchDiscovery").hidden=true;
+    // Someone pasting a playlist link into the search box means the
+    // playlist, not a search for its address.
+    const asList = listId(term);
+    if (asList) { $("q").value = ""; openPlaylist(asList); return; }
+
+    $("q").value = term;
+    $("q").blur();
+    $("searchEmpty").hidden = true;
+    $("histBlock").hidden = true;
+    $("results").innerHTML = "";
+    $("loading").hidden = false;
+
+    try {
+      const r = await api("/api/search?q=" + encodeURIComponent(term));
+
+      if (r.status === 401) return empty("Locked", "This copy can't reach the server.");
+      if (!r.ok) return empty("Hmm", "Search failed. Try again.");
+
+      results = (await r.json()).results || [];
+      if (!results.length) return empty("Nothing found", "Try a different spelling.");
+
+      remember(term);
+      fill($("results"), results);
+    } catch (err) {
+      empty("Offline", "Can't reach the server right now.");
+    } finally {
+      $("loading").hidden = true;
+    }
+  }
+
+  function empty(head, msg) {
+    const box = $("searchEmpty");
+    box.hidden = false;
+    box.querySelector("h3").textContent = head;
+    box.querySelector("p").textContent = msg;
+  }
+
+  function remember(term) {
+    store.history = [term, ...store.history.filter((h) => h !== term)].slice(0, 10);
+    save();
+  }
+
+  function drawHistory() {
+    const has = store.history.length > 0 && !$("results").children.length;
+    $("histBlock").hidden = !has;
+    if (!has) return;
+
+    const box = $("histChips");
+    box.innerHTML = "";
+    store.history.forEach((term) => {
+      const c = document.createElement("button");
+      c.className = "chip";
+      c.textContent = term;
+      c.addEventListener("click", () => search(term));
+      box.appendChild(c);
+    });
+  }
+
+  $("clearHist").addEventListener("click", () => {
+    store.history = []; save(); drawHistory(); toast("Cleared");
+  });
+
+  /* ---------- library --------------------------------------- */
+
+  let libView = "favs";
+  [...document.querySelectorAll("[data-lib]")].forEach((b) =>
+    b.addEventListener("click", () => {
+      libView = b.dataset.lib;
+      document.querySelectorAll("[data-lib]").forEach((x) => x.classList.toggle("on", x === b));
+      drawLib();
+    })
+  );
+
+  /* Finding something without scrolling for it. Title and artist,
+     because half of what anyone remembers is who sang it. */
+  let libFind = "";
+
+  function drawLib() {
+    accState();
+    const all = libView === "favs" ? store.favs : store.recents;
+    const q = libFind.trim().toLowerCase();
+    const list = q
+      ? all.filter((s) =>
+          (s.title || "").toLowerCase().includes(q) ||
+          (s.artist || "").toLowerCase().includes(q))
+      : all;
+
+    $("libFindClear").hidden = !libFind;
+    $("libEmpty").hidden = list.length > 0;
+
+    if (q && !list.length) {
+      $("libEmpty").querySelector("h3").textContent = "Nothing matches";
+      $("libEmpty").querySelector("p").textContent = "Try a different word.";
+    } else {
+      $("libEmpty").querySelector("h3").textContent =
+        libView === "favs" ? "Nothing saved" : "Nothing played yet";
+      $("libEmpty").querySelector("p").textContent =
+        libView === "favs" ? "Tap the heart on any song to keep it here."
+                           : "Songs you play show up here.";
+    }
+
+    // The field is only worth showing once there is enough to look
+    // through — on an empty library it is one more thing in the way.
+    const find = document.querySelector("#pLib .find");
+    if (find) find.hidden = all.length < 6 && !libFind;
+
+    fill($("libRows"), list);
+  }
+
+  /* ---------- favourites and history ------------------------ */
+
+  function toggleFav(song) {
+    const now = Date.now();
+    if (isFav(song.id)) {
+      store.favs = store.favs.filter((s) => s.id !== song.id);
+      store.gone[song.id] = now;
+      buzz("light");
+      toast("Removed");
+    } else {
+      delete store.gone[song.id];
+      store.favs.unshift(Object.assign({}, song, { at: now }));
+      buzzDone("success");
+      toast("Saved to favourites");
+    }
+    save();
+    pushSoon();
+    paintFavButtons();
+    if (!pages.Lib.hidden) drawLib();
+    if (!pages.Home.hidden) drawHome();
+  }
+
+  function addRecent(song) {
+    store.recents = [song, ...store.recents.filter((s) => s.id !== song.id)].slice(0, 30);
+    save();
+  }
+
+  function paintFavButtons(pop) {
+    const song = queue[index];
+    if (!song) return;
+    const on = isFav(song.id);
+    markFav($("mFav"), on, pop);
+    markFav($("nFav"), on, pop);
+  }
+
+  const tapFav = (e) => {
+    if (e) e.stopPropagation();
+    if (!queue[index]) return;
+    toggleFav(queue[index]);
+    paintFavButtons(true);
+  };
+  $("mFav").addEventListener("click", tapFav);
+  $("nFav").addEventListener("click", tapFav);
+
+  /* ==========================================================
+     ACCOUNT AND SYNC
+
+     Favourites live on the phone and always have. This adds a
+     copy on the server so they survive a new phone, and so the
+     bot and the app agree about what is saved. Nothing here is
+     required: every endpoint below may be missing, and the app
+     carries on exactly as it did before.
+
+     Identity comes from Telegram, which already knows who this
+     is — no password, no email, nothing new to remember. Inside
+     Telegram the signed initData is enough on its own. The
+     standalone APK has no Telegram around it, so it opens the bot
+     with a one-time nonce and waits for the bot to claim it.
+     ========================================================== */
+
+  let syncOff = false;          // set once the server says it cannot
+  let pushTimer = 0;
+
+  const linked = () => !!(store.link && store.link.token) || !!INIT;
+
+  function authHeaders() {
+    const h = headers();
+    if (store.link && store.link.token) h["Authorization"] = "Bearer " + store.link.token;
+    return h;
+  }
+
+  /* Two different kinds of "no", and telling them apart is the
+     difference between a message that helps and one that does not.
+
+       unreachable   nothing answered — the phone is offline, or the
+                     address the app was handed has moved. Temporary,
+                     so sync stays on and the next change tries again.
+
+       syncOff       something answered, and it has never heard of
+                     these routes. Permanent for this session; asking
+                     again on every favourite would be pointless.   */
+  let unreachable = false;
+  let lastStatus = 0;       // what the server actually said, for the message
+
+  async function sync(path, opts) {
+    if (syncOff) return null;
+    await ready;
+
+    let res;
+    try {
+      res = await fetch(SERVER + path, Object.assign({
+        headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+      }, opts || {}));
+      unreachable = false;
+      lastStatus = res.status;
+    } catch (e) {
+      unreachable = true;
+      lastStatus = 0;
+      return null;
+    }
+
+    /* A server that has not learned these routes yet answers 404,
+       and one built before accounts existed may answer 501. Either
+       way, stop asking for the rest of the session rather than
+       retrying on every favourite. */
+    if (res.status === 404 || res.status === 501) { syncOff = true; accState(); return null; }
+    if (res.status === 401) { unlink(true); return null; }
+    if (!res.ok) return null;
+    try { return await res.json(); } catch (e) { lastStatus = -1; return null; }
+  }
+
+  /* What went wrong, in words that say what to do about it — and,
+     when the server answered with something unexpected, what it
+     actually said. A number in the message is not pretty, but it is
+     the difference between "it didn't work" and knowing whether the
+     bot is down, rate limiting, or erroring. */
+  function whyNot() {
+    if (unreachable) return "Can't reach the server — check your connection";
+    if (syncOff)     return "This server doesn't do accounts yet";
+    if (lastStatus === 429) return "Too many tries — wait a minute";
+    if (lastStatus === -1)  return "The server sent something unreadable";
+    if (lastStatus >= 500)  return "The server had a problem (" + lastStatus + ") — try again";
+    if (lastStatus > 0)     return "The server said " + lastStatus + " — try again";
+    return "Couldn't start — try again";
+  }
+
+  /* ---------- merging ---------------------------------------
+     Last write wins, per song. Each side brings its favourites
+     with the time they were added and its tombstones with the
+     time they were removed; for any one id the later of the two
+     decides whether it is saved. That way a removal on one phone
+     survives a sync with a phone that still has the song, and
+     neither side has to be treated as the truth. */
+  function mergeFavs(local, remote) {
+    const at = {}, gone = {}, song = {};
+
+    const take = (side) => {
+      (side.favs || []).forEach((s) => {
+        if (!s || !s.id) return;
+        const t = s.at || 1;
+        if (!at[s.id] || t > at[s.id]) { at[s.id] = t; song[s.id] = s; }
+      });
+      Object.entries(side.gone || {}).forEach(([id, t]) => {
+        if (!gone[id] || t > gone[id]) gone[id] = t;
+      });
+    };
+    take(local); take(remote);
+
+    const favs = Object.keys(at)
+      .filter((id) => !gone[id] || at[id] > gone[id])
+      .sort((a, b) => at[b] - at[a])
+      .map((id) => Object.assign({}, song[id], { at: at[id] }));
+
+    // Tombstones for songs that came back are dead weight.
+    Object.keys(gone).forEach((id) => { if (at[id] > gone[id]) delete gone[id]; });
+    return { favs, gone };
+  }
+
+  async function pull() {
+    if (!linked()) return;
+    const remote = await sync("/api/favs");
+    if (!remote) return;
+    const merged = mergeFavs(store, remote);
+    const changed = merged.favs.length !== store.favs.length ||
+      merged.favs.some((s, i) => !store.favs[i] || store.favs[i].id !== s.id);
+    store.favs = merged.favs;
+    store.gone = merged.gone;
+    save();
+    if (changed) {
+      paintFavButtons();
+      if (!pages.Lib.hidden) drawLib();
+      if (!pages.Home.hidden) drawHome();
+    }
+    // Hand the merge straight back, so the server ends up agreeing.
+    await push();
+  }
+
+  async function push() {
+    if (!linked()) return;
+    accState("syncing");
+    const r = await sync("/api/favs", {
+      method: "POST",
+      body: JSON.stringify({ favs: store.favs, gone: store.gone }),
+    });
+    if (r) { store.syncedAt = Date.now(); save(); }
+    accState();
+  }
+
+  /* Favouriting a whole album one tap at a time should not be a
+     request each. Collect for a moment, then send once. */
+  function pushSoon() {
+    if (!linked() || syncOff) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(() => push().catch(() => {}), 1200);
+  }
+
+  /* ---------- connecting ------------------------------------ */
+
+  let pollTimer = 0, pollStop = 0;
+
+  function unlink(silent) {
+    store.link = null; save();
+    clearTimeout(pollTimer);
+    accState();
+    if (!silent) toast("Disconnected");
+  }
+
+  /* ---------- getting to Telegram --------------------------
+     Inside Telegram the bridge opens the chat properly. The
+     standalone APK has no bridge: the tg:// scheme reaches the
+     installed app directly through an Android intent, and if
+     nothing answers it the https link — which the system gives to
+     a browser, and the browser gives back to Telegram — is the
+     second try. The two are attempted in that order rather than
+     together, because firing both opens two things.
+
+     If neither lands the sheet still offers the link to copy, so
+     a phone without Telegram installed is never a dead end. */
+
+  let lastLink = "";
+
+  /* Leaving the app, wherever the app happens to be.
+
+     Inside Telegram the bridge does it properly. Outside, the
+     WebView is all we have: an app's own scheme goes straight to
+     it through an Android intent, and if nothing answers, the https
+     link — which the system hands to a browser and the browser
+     hands back to the app — is the second try. The two are
+     attempted in that order rather than together, because firing
+     both opens two things.                                       */
+
+  function openOutside(url, deep) {
+    if (tg) {
+      try {
+        if (/\/\/t\.me\//.test(url)) tg.openTelegramLink(url);
+        else tg.openLink(url);
+        return;
+      } catch (e) {}
+    }
+
+    const away = () => {
+      try { window.open(url, "_blank"); }
+      catch (e) { try { window.location.href = url; } catch (e2) {} }
+    };
+
+    /* An app's own scheme is only worth trying where an app could
+       answer it. In a browser it is a navigation that can only fail,
+       and eight hundred milliseconds of waiting for it to. */
+    if (!deep || !window.Capacitor || !window.Capacitor.isNativePlatform ||
+        !window.Capacitor.isNativePlatform()) return away();
+
+    let gone = false;
+    const leaving = () => { gone = true; };
+    document.addEventListener("visibilitychange", leaving, { once: true });
+    window.addEventListener("pagehide", leaving, { once: true });
+
+    try { window.location.href = deep; } catch (e) {}
+
+    setTimeout(() => {
+      document.removeEventListener("visibilitychange", leaving);
+      if (gone || document.hidden) return;   // the app took it
+      away();
+    }, 800);
+  }
+
+  function openTelegram(url, bot, start) {
+    openOutside(url, "tg://resolve?domain=" + encodeURIComponent(bot) +
+                     "&start=" + encodeURIComponent(start));
+  }
+
+  async function copyLink() {
+    if (!lastLink) return;
+    try {
+      await navigator.clipboard.writeText(lastLink);
+      buzzDone("success");
+      toast("Link copied — paste it in any browser");
+      return;
+    } catch (e) {}
+    /* No clipboard permission in this WebView. A selected, readable
+       link the person can long-press is still better than nothing. */
+    $("linkCopy").textContent = lastLink;
+    try {
+      const rng = document.createRange();
+      rng.selectNodeContents($("linkCopy"));
+      const sel = window.getSelection();
+      sel.removeAllRanges(); sel.addRange(rng);
+    } catch (e) {}
+    toast("Long-press the link to copy it");
+  }
+
+  async function startLink() {
+    const r = await sync("/api/link/start", { method: "POST" });
+    if (!r || !r.nonce) {
+      toast(whyNot());
+      accState();
+      sheet($("linkSheet"), false);
+      return;
+    }
+    const named = /t\.me\/([A-Za-z0-9_]+)/.exec(r.url || "");
+    const bot = r.bot || (named && named[1]) || "AartiMusic_bot";
+    const start = "link_" + r.nonce;
+    const url = r.url || ("https://t.me/" + bot + "?start=" + encodeURIComponent(start));
+    $("linkWait").hidden = false;
+    $("linkGo").textContent = "Open Telegram again";
+    $("linkCopy").textContent = "Waiting for Telegram. Tap Start in the chat, then come back.";
+
+    openTelegram(url, bot, start);
+    lastLink = url;
+    $("linkAlt").hidden = false;
+
+    // Poll rather than hold a socket open: the round trip is a
+    // person switching apps, and this has to survive the app being
+    // backgrounded and brought back.
+    clearTimeout(pollTimer);
+    pollStop = Date.now() + 120000;
+    const beat = async () => {
+      if (Date.now() > pollStop) {
+        $("linkWait").hidden = true;
+        $("linkCopy").textContent = "That took too long. Try again when you're ready.";
+        return;
+      }
+      const p = await sync("/api/link/poll?nonce=" + encodeURIComponent(r.nonce));
+      if (p && p.token) {
+        store.link = { token: p.token, userId: p.userId, name: p.name || "" };
+        save();
+        buzzDone("success");
+        sheet($("linkSheet"), false);
+        $("linkWait").hidden = true;
+        accState();
+        toast("Connected");
+        pull().catch(() => {});
+        return;
+      }
+      pollTimer = setTimeout(beat, 1800);
+    };
+    pollTimer = setTimeout(beat, 1800);
+  }
+
+  /* ---------- the strip ------------------------------------- */
+
+  function accState(mode) {
+    const box = $("account");
+    if (!box) return;
+    box.classList.toggle("syncing", mode === "syncing");
+
+    if (INIT && !store.link) {
+      // Running inside Telegram: already identified, nothing to do.
+      box.classList.add("linked");
+      $("accState").textContent = "Synced through Telegram";
+      $("accSub").textContent = "Your favourites match the bot";
+      $("accBtn").hidden = true;
+      return;
+    }
+    if (syncOff && !store.link) {
+      // Answered, and it has no idea what an account is. Saying so
+      // beats a Connect button that can only ever fail.
+      box.classList.remove("linked");
+      $("accState").textContent = "Saved on this phone";
+      $("accSub").textContent = "This server doesn't do accounts yet — favourites stay here";
+      $("accBtn").hidden = true;
+      return;
+    }
+
+    $("accBtn").hidden = false;
+    if (store.link) {
+      box.classList.add("linked");
+      $("accState").textContent = store.link.name
+        ? "Connected as " + store.link.name : "Connected to Telegram";
+      $("accSub").textContent = store.syncedAt
+        ? "Last synced " + new Date(store.syncedAt).toLocaleTimeString("en-IN",
+            { hour: "2-digit", minute: "2-digit" })
+        : "Favourites will follow you to any phone";
+      $("accBtn").textContent = "Disconnect";
+    } else {
+      box.classList.remove("linked");
+      $("accState").textContent = "Saved on this phone";
+      $("accSub").textContent = "Connect Telegram to keep these if you change phones";
+      $("accBtn").textContent = "Connect";
+    }
+  }
+
+  $("accBtn").addEventListener("click", () => {
+    buzz();
+    if (store.link) { unlink(); return; }
+    $("linkWait").hidden = true;
+    $("linkAlt").hidden = true;
+    $("linkGo").textContent = "Open Telegram";
+    $("linkCopy").textContent =
+      "Your favourites will follow you to any phone, and match what the bot already knows.";
+    sheet($("linkSheet"), true);
+  });
+  $("linkGo").addEventListener("click", () => { buzz(); startLink().catch(() => {}); });
+  $("linkAlt").addEventListener("click", () => { buzz(); copyLink(); });
+  $("linkCancel").addEventListener("click", () => {
+    clearTimeout(pollTimer);
+    sheet($("linkSheet"), false);
+  });
+  $("linkSheet").addEventListener("click", (e) => {
+    if (e.target === $("linkSheet")) { clearTimeout(pollTimer); sheet($("linkSheet"), false); }
+  });
+
+  /* ---------- playing --------------------------------------- */
+
+  function streamUrl(id) {
+    let url = SERVER + "/api/stream/" + encodeURIComponent(id);
+    const auth = [];
+    // An <audio src> can't carry a header — the browser makes that
+    // request itself — so the proof of identity rides in the address.
+    if (INIT) auth.push("initData=" + encodeURIComponent(INIT));
+    if (DEV_KEY) auth.push("devKey=" + encodeURIComponent(DEV_KEY));
+    return auth.length ? url + "?" + auth.join("&") : url;
+  }
+
+  // Track identity belongs to the loaded media, not a newly selected list.
+  let mediaId = null, resumePosition = null, lastCheckpoint = 0, restoredOnly = false;
+  function chooseSong(list, at) {
+    const song = list[at];
+    if (!song) return;
+    if (song.id === mediaId && !audio.ended && !audio.error) {
+      if (plist.classList.contains('open')) closePl();
+      if ($('queueSheet').classList.contains('open')) sheet($('queueSheet'),false);
+      openNow(); return;
+    }
+    queue = list.slice(); playAt(at);
+  }
+  function checkpoint() {
+    if (index < 0 || !queue[index] || queue[index].id !== mediaId) return;
+    const position = resumePosition !== null ? resumePosition : audio.currentTime;
+    try { localStorage.setItem('aarti.playback.v1', JSON.stringify({
+      queue: queue.slice(0, 500), index, position: Number.isFinite(position) ? position : 0,
+      at: Date.now()
+    })); } catch (_) {}
+  }
+  audio.addEventListener('timeupdate', () => {
+    if (Date.now() - lastCheckpoint > 2000) { lastCheckpoint = Date.now(); checkpoint(); }
+  });
+  ['pause','seeked'].forEach(event => audio.addEventListener(event, checkpoint));
+  addEventListener('pagehide', checkpoint);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) checkpoint(); });
+  audio.addEventListener('loadedmetadata', () => {
+    if (resumePosition === null || !Number.isFinite(audio.duration)) return;
+    const position = Math.min(resumePosition, Math.max(0, audio.duration - .25));
+    resumePosition = null; audio.currentTime = position;
+    setProgress(position / audio.duration); $('nCur').textContent = time(position);
+    $('nDur').textContent = time(audio.duration);
+  });
+  async function restorePlayback() {
+    let saved;
+    try { saved = JSON.parse(localStorage.getItem('aarti.playback.v1')); } catch (_) { return; }
+    if (!saved || !Array.isArray(saved.queue) || !Number.isInteger(saved.index) ||
+        !saved.queue[saved.index] || !Number.isFinite(saved.position) || saved.position < 0) return;
+    const restored = saved.queue.slice(0,500);
+    if (restored.some(song => !song || typeof song.id !== 'string' || typeof song.title !== 'string')) return;
+    const before = token;
+    await ready;
+    if (token !== before || mediaId) return;
+    queue = restored; index = saved.index; mediaId = queue[index].id;
+    resumePosition = saved.position; restoredOnly = true;
+    $('mini').hidden = false; document.body.classList.add('with-mini');
+    paint(queue[index]); icons(false); waiting(false);
+    $('nCur').textContent = time(resumePosition);
+    audio.preload = 'metadata'; audio.src = streamUrl(mediaId); audio.load();
+    markRows(); playerMotion.refresh();
+  }
+
+  async function playAt(i) {
+    if (i < 0 || i >= queue.length) return;
+
+    await ready;
+    const mine = ++token;                 // anything older is now stale
+    const song = queue[i];
+    mediaId = song.id; resumePosition = null; restoredOnly = false;
+    index = i;
+
+    buzz("light");
+    $("mini").hidden = false;
+    // The scrim behind the floating controls has to grow to cover
+    // the strip as well, now that there is one.
+    document.body.classList.add("with-mini");
+    waiting(true);
+    paint(song);
+    addRecent(song);
+
+    setProgress(0);
+    audio.src = streamUrl(song.id);
+    audio.load();
+    checkpoint();
+
+    const go = () => {
+      if (mine !== token) return;
+      audio.play().catch(() => {});
+    };
+    // A song nobody has asked for before is fetched from YouTube
+    // first, so the file may not exist yet when the tap happens.
+    audio.addEventListener("canplay", go, { once: true });
+    go();
+
+    markRows();
+  }
+
+  /* ---------- the light in the room -------------------------
+     One colour, taken from the artwork, is what lights the full
+     screen: the pool behind the cover, and the colour the cover
+     casts onto what is under it. The palette is unchanged — the
+     controls stay amber — but the light around them belongs to
+     whatever is playing.
+
+     Reading pixels back from an image the host will not share
+     throws, so every step falls back to the amber the app already
+     used rather than failing. The answer is kept, because the same
+     cover comes round again.                                    */
+
+  /* The cover's own colour when one can be read; otherwise the
+     palette's. Cached as null rather than as a colour, so changing
+     the theme changes the fallback for covers already seen. */
+  const themeGlow = () =>
+    getComputedStyle(document.documentElement)
+      .getPropertyValue("--glow").trim() || "224,162,83";
+  const litBy = new Map();
+
+  function lightFrom(src) {
+    if (!src) return Promise.resolve(null);
+    if (litBy.has(src)) return Promise.resolve(litBy.get(src));
+
+    return new Promise((done) => {
+      const finish = (v) => { litBy.set(src, v); done(v); };
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onerror = () => finish(null);
+      img.onload = () => {
+        try {
+          const N = 14;                       // enough to find a colour
+          const c = document.createElement("canvas");
+          c.width = c.height = N;
+          const g = c.getContext("2d", { willReadFrequently: true });
+          g.drawImage(img, 0, 0, N, N);
+          const d = g.getImageData(0, 0, N, N).data;
+
+          let r = 0, gr = 0, b = 0, w = 0;
+          for (let i = 0; i < d.length; i += 4) {
+            const R = d[i], G = d[i + 1], B = d[i + 2];
+            const hi = Math.max(R, G, B), lo = Math.min(R, G, B);
+            if (hi < 32 || hi > 246) continue;          // black, or blown out
+            const sat = (hi - lo) / hi;
+            if (sat < 0.12) continue;                    // grey carries no light
+            // A colour counts for more the more of a colour it is.
+            const k = sat * sat * (hi / 255);
+            r += R * k; gr += G * k; b += B * k; w += k;
+          }
+          if (!w) return finish(null);
+
+          // Lifted to an even brightness, so a dark cover still
+          // lights the room and a bright one does not flood it.
+          let out = [r / w, gr / w, b / w];
+          const lift = 208 / Math.max(1, Math.max(out[0], out[1], out[2]));
+          out = out.map((n) => Math.min(255, Math.round(n * lift)));
+          finish(out.join(","));
+        } catch (e) {
+          finish(null);                       // the canvas was tainted
+        }
+      };
+      img.src = src;
+    });
+  }
+
+  function relight(song) {
+    const lit = $("nowLit");
+    if (lit) lit.classList.add("dimming");
+    lightFrom(song && song.thumb).then((rgb) => {
+      document.documentElement.style.setProperty("--lit", rgb || themeGlow());
+      if (lit) requestAnimationFrame(() => lit.classList.remove("dimming"));
+    });
+  }
+
+  /* The new cover arrives rather than being swapped out from under
+     you: hidden the instant the track changes, faded up once it has
+     actually loaded. Opacity only, and a timeout so a picture that
+     never loads cannot leave an empty square. */
+  function setArt(el, src) {
+    if (!el || el.getAttribute("src") === src) return;
+    el.classList.add("swapping");
+    const show = () => el.classList.remove("swapping");
+    el.addEventListener("load", show, { once: true });
+    el.addEventListener("error", show, { once: true });
+    el.src = src;
+    setTimeout(show, 900);
+  }
+
+  function paint(song) {
+    setArt($("nArt"), song.thumb);
+    relight(song);
+    $("nowBg").style.backgroundImage = 'url("' + song.thumb + '")';
+    $("mTitle").textContent = song.title;
+    $("nTitle").textContent = song.title;
+    $("mArtist").textContent = song.artist || "Unknown";
+    $("nArtist").textContent = song.artist || "Unknown";
+    $("nDur").textContent = time(song.duration);
+
+    const nxt = queue[index + 1];
+    $("upNextLabel").textContent = nxt ? "Up next · " + nxt.title : "Queue";
+    paintFavButtons();
+  }
+
+  function markRows() {
+    const id = queue[index] && queue[index].id;
+    document.querySelectorAll(".row").forEach((row) => {
+      const t = row.querySelector(".title");
+      row.classList.toggle("on", !!id && t && t.textContent === (queue[index] || {}).title);
+    });
+  }
+
+  const waiting = (on) => {
+    $("mPlay").classList.toggle("wait", on);
+    $("nPlay").classList.toggle("wait", on);
+  };
+
+  const toggle = () => {
+    if (!audio.src) return;
+    buzz();
+    audio.paused ? audio.play().catch(() => {}) : audio.pause();
+  };
+  $("mPlay").addEventListener("click", (e) => { e.stopPropagation(); toggle(); });
+  $("nPlay").addEventListener("click", toggle);
+
+  function nextIndex() {
+    if (store.repeat === "one") return index;
+    if (index < queue.length - 1) return index + 1;
+    return store.repeat === "all" ? 0 : -1;
+  }
+
+  const next = () => { const i = nextIndex(); if (i >= 0) playAt(i); };
+  $("nNext").addEventListener("click", next);
+  $("nPrev").addEventListener("click", () => {
+    // Part-way in, "previous" restarts the song — as everywhere else.
+    if (audio.currentTime > 4) { audio.currentTime = 0; return; }
+    playAt(index - 1);
+  });
+
+  audio.addEventListener("playing", () => {
+    waiting(false); icons(true);
+    document.body.classList.add("playing");
+  });
+  audio.addEventListener("pause", () => {
+    icons(false);
+    document.body.classList.remove("playing");
+  });
+  audio.addEventListener("waiting", () => waiting(true));
+
+  audio.addEventListener("ended", () => {
+    if (sleepAt === -1) { sleepAt = 0; toast("Sleep timer — stopping"); return; }
+    if (store.repeat === "one") { audio.currentTime = 0; audio.play().catch(() => {}); return; }
+    next();
+  });
+
+  audio.addEventListener("error", () => {
+    waiting(false);
+    toast("Couldn't play that one");
+    // One dead track shouldn't end the session.
+    const failedToken = token;
+    if (!restoredOnly) setTimeout(() => { if (token === failedToken) next(); }, 800);
+  });
+
+  function setProgress(p) {
+    p = p < 0 ? 0 : p > 1 ? 1 : p;
+    const v = p.toFixed(5);
+    $("miniFill").style.setProperty("--p", v);
+    $("seekFill").style.setProperty("--p", v);
+    $("seekRail").style.setProperty("--p", v);
+  }
+
+  /* The morph is a CSS `d` transition. Where `d` is not an
+     animatable property the stylesheet's rules are simply
+     ignored, so the shape would stay stuck as a triangle — the
+     attribute gets written directly in that case, which lands on
+     the right shape without the travel. */
+  const CAN_MORPH = window.CSS && CSS.supports && CSS.supports("d", 'path("M0 0Z")');
+  const SHAPE = {
+    paused:  { l: "M7 4.2L13.2 8L13.2 16L7 19.8Z", r: "M13.2 8L19.6 11.8L19.6 12.2L13.2 16Z" },
+    playing: { l: "M6 4L10 4L10 20L6 20Z",         r: "M14 4L18 4L18 20L14 20Z" },
+  };
+
+  function icons(playing) {
+    const state = playing ? "playing" : "paused";
+    document.querySelectorAll(".play").forEach((btn) => {
+      btn.dataset.state = state;
+      btn.setAttribute("aria-label", playing ? "Pause" : "Play");
+      if (CAN_MORPH) return;
+      const l = btn.querySelector(".mp.l"), r = btn.querySelector(".mp.r");
+      if (l) l.setAttribute("d", SHAPE[state].l);
+      if (r) r.setAttribute("d", SHAPE[state].r);
+    });
+  }
+
+  audio.addEventListener("timeupdate", () => {
+    told.position();
+    const d = audio.duration;
+    if (!d || !isFinite(d)) return;
+    // --p is a plain 0..1 number the stylesheet turns into a
+    // transform; nothing here touches width or left.
+    setProgress(audio.currentTime / d);
+    $("nCur").textContent = time(audio.currentTime);
+    $("nDur").textContent = time(d);
+
+    if (sleepAt > 0 && Date.now() > sleepAt) {
+      audio.pause(); sleepAt = 0; toast("Sleep timer — paused");
+    }
+  });
+
+  /* ---------- shuffle and repeat ---------------------------- */
+
+  function shuffled(list) {
+    const a = list.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  $("bShuffle").addEventListener("click", () => {
+    store.shuffle = !store.shuffle;
+    save(); paintModes(); buzz();
+
+    if (store.shuffle && queue.length > 1) {
+      // Keep the current song where it is and shuffle what's left, so
+      // turning it on doesn't interrupt what's playing.
+      const current = queue[index];
+      const rest = shuffled(queue.filter((_, i) => i !== index));
+      queue = [current, ...rest];
+      index = 0;
+      paint(current);
+    }
+    toast(store.shuffle ? "Shuffle on" : "Shuffle off");
+  });
+
+  $("bRepeat").addEventListener("click", () => {
+    store.repeat = store.repeat === "off" ? "all" : store.repeat === "all" ? "one" : "off";
+    save(); paintModes(); buzz();
+    toast(store.repeat === "off" ? "Repeat off"
+        : store.repeat === "all" ? "Repeat queue" : "Repeat one");
+  });
+
+  function paintModes() {
+    $("bShuffle").classList.toggle("on", store.shuffle);
+    $("bRepeat").classList.toggle("on", store.repeat !== "off");
+    $("bRepeat").querySelector(".one").hidden = store.repeat !== "one";
+  }
+
+  /* ---------- seeking --------------------------------------- */
+
+  const rail = $("seekRail");
+  const seekTo = (x) => {
+    const d = audio.duration;
+    if (!d || !isFinite(d)) return;
+    const box = rail.getBoundingClientRect();
+    const p = Math.min(1, Math.max(0, (x - box.left) / box.width));
+    setProgress(p);                      // move with the finger
+    audio.currentTime = p * d;
+  };
+  // A vertical drag crossing the rail must never change playback time.
+  let seekPointer = null;
+  rail.style.touchAction = 'none';
+  rail.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || playerMotion.progress < .999) return;
+    seekPointer = { id:e.pointerId, x:e.clientX, y:e.clientY, axis:null };
+    rail.setPointerCapture(e.pointerId);
+  });
+  rail.addEventListener('pointermove', e => {
+    const d = seekPointer; if (!d || d.id !== e.pointerId) return;
+    const dx=e.clientX-d.x, dy=e.clientY-d.y;
+    if (!d.axis && Math.max(Math.abs(dx),Math.abs(dy))>8)
+      d.axis=Math.abs(dx)>Math.abs(dy)*1.3?'x':'y';
+    if (d.axis==='x') { document.body.classList.add('seeking'); seekTo(e.clientX); }
+  });
+  rail.addEventListener('pointerup', e => {
+    const d=seekPointer;seekPointer=null;document.body.classList.remove('seeking');
+    if (d && d.id===e.pointerId && d.axis!=='y' && Date.now()-swipedAt>500) seekTo(e.clientX);
+  });
+  for (const event of ['pointercancel','lostpointercapture']) rail.addEventListener(event, () => {
+    seekPointer=null;document.body.classList.remove('seeking');
+  });
+  rail.setAttribute('role','slider');rail.tabIndex=0;rail.setAttribute('aria-label','Playback position');
+  rail.addEventListener('keydown', e => {
+    if (!['ArrowLeft','ArrowRight'].includes(e.key) || !Number.isFinite(audio.duration)) return;
+    e.preventDefault();audio.currentTime=Math.max(0,Math.min(audio.duration,audio.currentTime+(e.key==='ArrowRight'?5:-5)));
+  });
+
+  /* ---------- what Back means -------------------------------
+     Telegram draws its own back button, wired below. In the Android
+     app Back is the system gesture, and by default it leaves the
+     app — mid-song, from the full screen, which is not what anyone
+     means by pressing it.
+
+     So everything that opens over the screen adds a history entry.
+     Back closes that first and only leaves the app once nothing is
+     open. The browser gets the same behaviour for free.
+
+     The stack is kept in step by hand rather than by routing every
+     close through history.back(), because closing by tap, by drag
+     and by Back all have to keep working, and each has to know
+     whether the entry it is unwinding is already gone.          */
+
+  const overlays = [];    // { el, close }, innermost last
+  let unwinding = false;  // inside a close that Back itself started
+  let ourPops = 0;        // popstate events we asked for and must swallow
+
+  function opened(el, close) {
+    overlays.push({ el, close });
+    try { history.pushState({ aarti: overlays.length }, ""); } catch (e) {}
+  }
+
+  function closed(el) {
+    const i = overlays.map((o) => o.el).lastIndexOf(el);
+    if (i < 0) return;            // never opened through here, or already gone
+    overlays.splice(i, 1);
+    if (unwinding) return;        // Back has already spent the entry
+    ourPops++;
+    try { history.back(); } catch (e) { ourPops--; }
+  }
+
+  window.addEventListener("popstate", () => {
+    if (ourPops > 0) { ourPops--; return; }   // our own tidying up
+    const top = overlays.pop();
+    if (!top) return;                         // nothing of ours left: let it go
+    unwinding = true;
+    try { top.close(); } finally { unwinding = false; }
+  });
+
+  /* ---------- sheets ---------------------------------------- */
+
+  const sheet = (el, on) => {
+    // Opening what is open, or closing what is shut, would push or
+    // spend a history entry for nothing.
+    if (!!on === el.classList.contains("open")) return;
+
+    el.classList.toggle("open", on);
+    el.setAttribute("aria-hidden", on ? "false" : "true");
+    if (on) {
+      // A sheet dragged halfway and released leaves --veil part-faded;
+      // without this the next open would start dim.
+      el.style.setProperty("--veil", "1");
+      opened(el, () => sheet(el, false));
+    } else {
+      closed(el);
+    }
+  };
+
+  /* ---------- growing out of the thing you tapped -----------
+     Every full-screen thing in here opens the same way: it starts
+     as the rectangle you touched and grows into the screen. The
+     panel is the one that moves; this only works out where it has
+     to start from and hands the browser two numbers and a
+     translate.
+
+     A source that has scrolled out of sight, or that was never on
+     screen, gives nothing back — and the caller falls through to
+     the slide it always had. Same when the phone is set to reduce
+     motion: there the panel is simply there.
+
+     Reversing it is the same call with the panel already open,
+     which is why the close does not need its own machinery.   */
+
+  const cameFrom = new WeakMap();   // panel -> what it grew out of
+  const growTimer = new WeakMap();
+
+  function onScreen(el) {
+    if (!el || !el.isConnected || !el.getBoundingClientRect) return null;
+    const r = el.getBoundingClientRect();
+    if (r.width < 4 || r.height < 4) return null;
+    if (r.bottom <= 0 || r.top >= window.innerHeight) return null;
+    return r;
+  }
+
+  function growFrom(panel, from) {
+    if (REDUCED) return false;
+    const r = onScreen(from);
+    const vw = window.innerWidth, vh = window.innerHeight;
+    if (!r || !vw || !vh) return false;
+    panel.style.setProperty("--ex-x", r.left.toFixed(1) + "px");
+    panel.style.setProperty("--ex-y", r.top.toFixed(1) + "px");
+    panel.style.setProperty("--ex-sx", (r.width / vw).toFixed(4));
+    panel.style.setProperty("--ex-sy", (r.height / vh).toFixed(4));
+    panel.classList.add("growing");
+    // Left on for the length of the move and then taken off, so a
+    // panel opened any other way is back to the plain slide.
+    clearTimeout(growTimer.get(panel));
+    growTimer.set(panel, setTimeout(() => panel.classList.remove("growing"), 560));
+    return true;
+  }
+
+  /* The rectangle has to become the panel's resting position before
+     it is told to fill the screen — untransitioned, and committed
+     by a forced reflow. Skip either half and the browser animates
+     *into* the rectangle instead of out of it, and what you get is
+     the old slide taking the scenic route.
+
+     Closing needs none of this: the panel is already at rest, at
+     full size, which is exactly the start that move wants.      */
+  function settle(panel) {
+    panel.classList.add("placing");
+    void panel.offsetWidth;
+    panel.classList.remove("placing");
+  }
+
+  // The same artwork is continuously mapped between mini and full slots.
+  const now = $("now");
+  const playerMotion = AartiPlayerMotion({
+    panel: now, mini: $("mini"), art: $("sharedArt"),
+    miniSlot: $("mArt"), fullSlot: $("fullArtSlot"),
+    canDrag: () => gesture !== "x",
+    onPress: () => { swipedAt=0; },
+    onGesture: () => { gesture = "y"; swipedAt = Date.now(); },
+    onGestureEnd: () => { if (gesture === "y") gesture = null; swipedAt = Date.now(); },
+    onOpen: () => {
+      document.body.classList.add("locked");
+      try { tg.BackButton.show(); } catch (_) {}
+      opened(now, () => playerMotion.close());
+    },
+    onClosed: () => {
+      if (!$("plist").classList.contains("open")) document.body.classList.remove("locked");
+      try { tg.BackButton.hide(); } catch (_) {}
+      closed(now);
+    },
+  });
+  const openNow = () => playerMotion.open();
+  const closeNow = () => playerMotion.close();
+  $("miniOpen").addEventListener("click", () => {
+    // A swipe that ended on this element still fires a click.
+    if (Date.now() - swipedAt < 400) return;
+    openNow($("mArt"));
+  });
+  $("mArt").addEventListener("click", () => openNow($("mArt")));
+  $("nowClose").addEventListener("click", () => closeNow());
+  try { tg.BackButton.onClick(() => closeNow()); } catch (e) {}
+
+  /* ---------- dragging the full screen down -----------------
+     It used to compare two touch points and close if the second
+     was 90px lower — the sheet never moved under the finger, so a
+     drag felt like a gesture being graded rather than a thing
+     being held.
+
+     Now it follows. Release decides by distance OR by speed, so a
+     short flick closes it and a slow pull most of the way down
+     does too, which is what the hand expects of both.
+
+     Drags that begin on a control are left alone: the seek rail
+     has its own touch handling, and a scrollable list needs its
+     own vertical movement. */
+  const DRAG_SKIP = "button,input,.seek-rail,.rows,.rail";
+
+  /* ---------- one gesture at a time -------------------------
+     The full screen drags down to close and the cover swipes
+     sideways to change song. Both start from the same finger on
+     the same pixels, so whichever recognises its own direction
+     first owns the gesture until that finger lifts, and the other
+     stands down rather than both moving at once.              */
+  let gesture = null;                     // "x" | "y" | null
+
+  function draggable(el, onClose, opts) {
+    const o = opts || {};
+    const surface = o.surface || el;
+    let id = null, y0 = 0, t0 = 0, dy = 0, live = false;
+
+    const setY = (v) => { surface.style.transform = "translateY(" + v.toFixed(1) + "px)"; };
+    const clear = () => {
+      el.classList.remove("dragging");
+      surface.style.transform = "";
+    };
+
+    // -webkit-user-drag is not honoured everywhere; refusing the
+    // dragstart outright is what actually keeps the gesture alive.
+    el.addEventListener("dragstart", (e) => e.preventDefault());
+
+    el.addEventListener("pointerdown", (e) => {
+      if (!el.classList.contains("open")) return;
+      if (e.target.closest && e.target.closest(DRAG_SKIP)) return;
+      id = e.pointerId; y0 = e.clientY; t0 = e.timeStamp; dy = 0; live = false;
+    }, { passive: true });
+
+    el.addEventListener("pointermove", (e) => {
+      if (e.pointerId !== id) return;
+      dy = e.clientY - y0;
+      // Wait for a clear vertical intent before taking the gesture,
+      // so a tap that wobbles a pixel is still a tap.
+      if (!live) {
+        if (gesture === "x") return;      // the cover has this one
+        if (dy < 6) return;
+        live = true;
+        gesture = "y";
+        // Whatever the panel was in the middle of, it is being held
+        // now; the per-frame transform below is the only thing that
+        // should be moving it.
+        el.classList.remove("growing");
+        el.classList.add("dragging");
+      }
+      // Upward is resisted rather than blocked — the surface is
+      // already as far up as it goes.
+      const shown = dy < 0 ? dy / 4 : dy;
+      setY(shown);
+      if (o.onDrag) o.onDrag(shown);
+    }, { passive: true });
+
+    const finish = (e) => {
+      if (e.pointerId !== id) return;
+      id = null;
+      if (!live) return;
+      const dt = Math.max(1, e.timeStamp - t0);
+      const speed = dy / dt;                      // px per ms
+      const far = dy > (o.threshold || 110);
+      const flung = speed > 0.55 && dy > 24;
+      el.classList.remove("dragging");
+      surface.style.transform = "";
+      if (o.onDrag) o.onDrag(0);
+      live = false;
+      if (gesture === "y") gesture = null;
+      if (far || flung) onClose();
+    };
+    el.addEventListener("pointerup", finish, { passive: true });
+    el.addEventListener("pointercancel", (e) => {
+      if (e.pointerId !== id) return;
+      id = null; live = false; clear();
+      if (gesture === "y") gesture = null;
+      if (o.onDrag) o.onDrag(0);
+    }, { passive: true });
+  }
+
+  // Player vertical motion is owned exclusively by playerMotion.
+
+  /* ---------- swiping the cover to change song --------------
+     Left for the next one, right for the one before. The cover
+     follows the finger, and on release either flies out and the
+     new one comes in from the other side, or springs back.
+
+     At the ends of the queue the drag is damped to a quarter
+     instead of being ignored: the edge should be felt rather
+     than just not happening.                                  */
+
+  /* The swipe is acknowledged rather than animated: the new cover
+     comes in from the side the old one went, over a fifth of a
+     second and eighteen pixels. Enough to say the gesture landed;
+     not the card slide that made this feel slow. */
+  function arrived(way) {
+    if (REDUCED) return;
+    ["coverSwipe"].forEach((id) => {
+      const el = $(id);
+      if (!el) return;
+      el.classList.remove("came-next", "came-prev");
+      void el.offsetWidth;                 // so a second swipe replays it
+      el.classList.add("came-" + way);
+      el.addEventListener("animationend", function off() {
+        el.classList.remove("came-next", "came-prev");
+        el.removeEventListener("animationend", off);
+      }, { once: true });
+    });
+  }
+
+  /* ---------- swiping to change song ------------------------
+     Left for the next one, right for the one before.
+
+     Nothing moves with the finger and nothing slides away. The
+     gesture is recognised, the track changes, and the new cover
+     arrives on its own — a card sliding off costs two hundred
+     milliseconds that the change itself does not need, and the
+     whole point of a swipe here is that it is faster than
+     reaching for the button.
+
+     Used twice: the cover on the full screen, and the strip along
+     the bottom, which is where the hand already is.           */
+
+  function swipeToSkip(hit, opts) {
+    if (!hit) return;
+    const o = opts || {};
+    const NEED = o.threshold || 64;   // px of travel before it counts
+    let id = null, x0 = 0, y0 = 0, t0 = 0, mine = false, spent = false;
+
+    hit.addEventListener("dragstart", (e) => e.preventDefault());
+
+    function skip(dx) {
+      spent = true;                   // one gesture, one track, ever
+      buzzPick();
+      if (o.onTaken) o.onTaken();
+      if (dx < 0) next(); else playAt(index - 1);
+      arrived(dx < 0 ? "next" : "prev");
+    }
+
+    hit.addEventListener("pointerdown", (e) => {
+      if (o.when && !o.when()) return;
+      if (o.skip && e.target.closest && e.target.closest(o.skip)) return;
+      id = e.pointerId; x0 = e.clientX; y0 = e.clientY; t0 = e.timeStamp;
+      mine = false; spent = false;
+    }, { passive: true });
+
+    hit.addEventListener("pointermove", (e) => {
+      if (e.pointerId !== id || spent) return;
+      const dx = e.clientX - x0;
+      const dy = e.clientY - y0;
+
+      if (!mine) {
+        // The full screen drags down to close from these same
+        // pixels. A gesture that is mostly vertical is theirs, and
+        // must stay theirs — sideways has to be clearly sideways.
+        if (gesture === "y" || (Math.abs(dy)>8 && Math.abs(dy)>Math.abs(dx))) { id = null; return; }
+
+        // Up is a way in. The strip is a handle for the screen
+        // underneath it, so a clear upward swipe lifts it.
+        if (o.onUp && dy < -26 && Math.abs(dy) > Math.abs(dx) * 1.4) {
+          spent = true;
+          buzz();
+          o.onUp();
+          return;
+        }
+
+        if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+        mine = true;
+        gesture = "x";
+        /* Taken now, not on the way down. A swipe carries the finger
+           off the cover and often off the screen, and without this
+           the release is never heard — which leaves the gesture
+           marked as this one's for the rest of the session, and the
+           drag that closes the full screen silently stops working.
+
+           Not on pointerdown, because a captured pointer delivers
+           its click to whatever captured it, and the strip below
+           has to stay tappable. */
+        try { hit.setPointerCapture(e.pointerId); } catch (err) {}
+      }
+
+      // The moment it is far enough, it has happened. Waiting for
+      // the finger to lift is what makes a swipe feel sluggish.
+      if (Math.abs(dx) >= NEED) skip(dx);
+    }, { passive: true });
+
+    const finish = (e) => {
+      if (e.pointerId !== id) return;
+      id = null;
+      if (gesture === "x") gesture = null;
+      // A quick flick is a swipe even when it barely travelled.
+      if (mine && !spent) {
+        const dx = e.clientX - x0;
+        const dt = Math.max(1, e.timeStamp - t0);
+        if (Math.abs(dx) / dt > 0.5 && Math.abs(dx) > 24) skip(dx);
+      }
+      mine = false;
+    };
+
+    hit.addEventListener("pointerup", finish, { passive: true });
+    hit.addEventListener("pointercancel", (e) => {
+      if (e.pointerId !== id) return;
+      id = null;
+      if (gesture === "x") gesture = null;
+      mine = false;
+    }, { passive: true });
+
+    /* Belt and braces: whatever ends the capture also ends the
+       gesture, so nothing can be left holding it.
+
+       Only when it is this element losing it, though. A touch
+       pointer is implicitly captured by whatever it landed on the
+       moment it lands, so taking the capture here makes *that*
+       element lose it — and the event bubbles up through this one.
+       Treating that as the end of the gesture killed every swipe on
+       the second frame of movement, on every phone, while a mouse
+       (which has no implicit capture) went on working. */
+    hit.addEventListener("lostpointercapture", (e) => {
+      if (e.target !== hit || e.pointerId !== id) return;
+      id = null;
+      if (gesture === "x") gesture = null;
+      mine = false;
+    });
+  }
+
+  // The cover on the full screen.
+  swipeToSkip($("sharedArt"), { onTaken: () => { swipedAt = Date.now(); } });
+
+  /* The strip along the bottom. Its buttons are left alone — a
+     finger that starts on play or the heart means that button —
+     and a swipe there must not also count as the tap that opens
+     the full screen. */
+  let swipedAt = 0;
+  swipeToSkip($("mini"), {
+    skip: "button",
+    onTaken: () => { swipedAt = Date.now(); },
+  });
+
+  /* The sheets drag on their own panel rather than the whole
+     overlay, and the backdrop thins as the panel goes down — the
+     screen behind it coming back is what tells you the gesture is
+     working before you have committed to it. A shorter threshold
+     than the full screen, because a sheet is shorter. */
+  [["queueSheet", 90], ["actionSheet", 80], ["sleepSheet", 80]].forEach(([id, threshold]) => {
+    const el = $(id);
+    const panel = el.querySelector(".sheet-in");
+    draggable(el, () => sheet(el, false), {
+      surface: panel,
+      threshold: threshold,
+      onDrag: (dy) => {
+        const fade = dy > 0 ? Math.max(0, 1 - dy / (threshold * 2.4)) : 1;
+        el.style.setProperty("--veil", fade.toFixed(3));
+      },
+    });
+  });
+
+  // queue
+  $("queueOpen").addEventListener("click", () => {
+    const box = $("queueRows");
+    box.innerHTML = "";
+    queue.forEach((song, i) => {
+      const row = rowFor(song, queue, i);
+      if (i < index) row.style.opacity = ".45";
+      box.appendChild(row);
+    });
+    sheet($("queueSheet"), true);
+  });
+  $("queueClose").addEventListener("click", () => sheet($("queueSheet"), false));
+  $("queueSheet").addEventListener("click", (e) => {
+    if (e.target === $("queueSheet")) sheet($("queueSheet"), false);
+  });
+
+  // per-song actions
+  function openActions(song) {
+    actionSong = song;
+    $("actSong").textContent = song.title;
+    $("actFav").textContent = isFav(song.id) ? "Remove from favourites" : "Add to favourites";
+    sheet($("actionSheet"), true);
+  }
+  $("actionSheet").addEventListener("click", (e) => {
+    const act = e.target.dataset && e.target.dataset.act;
+    if (!act) { if (e.target === $("actionSheet")) sheet($("actionSheet"), false); return; }
+
+    if (act === "playlist" && actionSong) { personalLibrary.addSong(actionSong); }
+    if (act === "next" && actionSong) {
+      queue.splice(index + 1, 0, actionSong);
+      paint(queue[index]); buzzDone("success"); toast("Playing next");
+    }
+    if (act === "queue" && actionSong) {
+      queue.push(actionSong); buzzDone("success"); toast("Added to queue");
+    }
+    if (act === "fav" && actionSong) {
+      toggleFav(actionSong);
+      document.querySelectorAll(".row").forEach(() => {});
+      drawHome();
+    }
+    sheet($("actionSheet"), false);
+  });
+
+  // sleep timer
+  $("nowMenu").addEventListener("click", () => sheet($("sleepSheet"), true));
+  $("sleepSheet").addEventListener("click", (e) => {
+    const v = e.target.dataset && e.target.dataset.sleep;
+    if (v === undefined) { if (e.target === $("sleepSheet")) sheet($("sleepSheet"), false); return; }
+
+    if (v === "track") { sleepAt = -1; toast("Stopping after this track"); }
+    else if (v === "0") { sleepAt = 0; toast("Sleep timer off"); }
+    else { sleepAt = Date.now() + parseInt(v, 10) * 60000; toast(`Sleeping in ${v} minutes`); }
+
+    sheet($("sleepSheet"), false);
+  });
+
+  /* ---------- what the phone shows while it plays ------------
+     The notification, the lock screen, and on phones that have one
+     the capsule in the status bar, are all the same thing: a media
+     session the system knows about.
+
+     In a browser or inside Telegram the Media Session API provides
+     it. In the Android app it does not exist — the WebView has no
+     implementation, so an <audio> tag playing in here is invisible
+     to the system: no notification, nothing on the lock screen, and
+     Android is free to stop the audio the moment the app goes to
+     the background. The native plugin supplies both halves, the
+     session and the foreground service that keeps playback alive.
+
+     Same five actions either way. The rest of the file calls `told`
+     and does not have to know which one answered.               */
+
+  /* Capacitor does not hand the page its plugins. Capacitor.Plugins
+     is filled in by registerPlugin(), which is normally called by the
+     plugin's own JavaScript — and importing that needs a bundler,
+     which this app deliberately does not have. So reading
+     Capacitor.Plugins.MediaSession finds nothing, for ever, in
+     silence. The global registerPlugin is the same function and asks
+     the native side for the method signatures, which is what makes a
+     callback method like setActionHandler work at all.
+
+     isPluginAvailable checks the headers the native bridge injects,
+     so this is a real answer about this build rather than a guess. */
+  function nativePlugin(name) {
+    try {
+      const c = window.Capacitor;
+      if (!c || !c.isNativePlatform || !c.isNativePlatform()) return null;
+      if (c.Plugins && c.Plugins[name]) return c.Plugins[name];
+      if (!c.isPluginAvailable || !c.isPluginAvailable(name)) return null;
+      return c.registerPlugin ? c.registerPlugin(name) : null;
+    } catch (e) { return null; }
+  }
+
+  const nativeMS = nativePlugin("MediaSession");
+  const webMS = "mediaSession" in navigator ? navigator.mediaSession : null;
+
+  const told = {
+    /* Native side needs the handlers before it will draw any
+       controls, and they never change, so they are set once. */
+    wired: false,
+
+    actions() {
+      if (this.wired) return;
+      this.wired = true;
+
+      const acts = {
+        play: () => audio.play().catch(() => {}),
+        pause: () => audio.pause(),
+        nexttrack: () => next(),
+        previoustrack: () => playAt(index - 1),
+        stop: () => { audio.pause(); audio.currentTime = 0; },
+        seekto: (d) => { if (d && d.seekTime != null) audio.currentTime = d.seekTime; },
+      };
+
+      for (const name in acts) {
+        if (nativeMS) {
+          try { nativeMS.setActionHandler({ action: name }, acts[name]); } catch (e) {}
+        } else if (webMS) {
+          // A browser that has never heard of an action throws rather
+          // than ignoring it, so each one stands alone.
+          try { webMS.setActionHandler(name, acts[name]); } catch (e) {}
+        }
+      }
+    },
+
+    metadata(song) {
+      if (!song) return;
+      const m = {
+        title: song.title || "Aarti Music",
+        artist: song.artist || "Aarti Music",
+        album: "Aarti Music",
+        artwork: [{ src: song.thumb, sizes: "480x360", type: "image/jpeg" }],
+      };
+      if (nativeMS) { try { nativeMS.setMetadata(m); } catch (e) {} return; }
+      if (webMS && window.MediaMetadata) {
+        try { webMS.metadata = new MediaMetadata(m); } catch (e) {}
+      }
+    },
+
+    /* The notification only appears once the session says it is
+       playing, so this is not decoration — it is what puts it on
+       screen and what takes it away again. */
+    state(playbackState) {
+      if (nativeMS) { try { nativeMS.setPlaybackState({ playbackState }); } catch (e) {} return; }
+      if (webMS) { try { webMS.playbackState = playbackState; } catch (e) {} }
+    },
+
+    /* Moves the seek bar in the notification. timeupdate fires four
+       times a second and this crosses the bridge, so it is sent at
+       most once a second and whenever the position jumps. */
+    sent: 0,
+    position(force) {
+      const d = audio.duration;
+      if (!isFinite(d) || d <= 0) return;
+      const now = Date.now();
+      if (!force && now - this.sent < 1000) return;
+      this.sent = now;
+
+      const p = { duration: d, position: Math.min(audio.currentTime, d), playbackRate: audio.playbackRate || 1 };
+      if (nativeMS) { try { nativeMS.setPositionState(p); } catch (e) {} return; }
+      if (webMS && webMS.setPositionState) { try { webMS.setPositionState(p); } catch (e) {} }
+    },
+  };
+
+  /* Android 13 hides every notification, a foreground service's
+     included, until notifications are allowed. Asked on the first
+     song rather than at startup, so the prompt turns up when it
+     means something — and never on a platform that has no such
+     permission to ask about. Declining costs nothing but the
+     notification; the music plays either way. */
+  let askedToNotify = false;
+  async function mayNotify() {
+    if (askedToNotify || !nativeMS) return;
+    askedToNotify = true;
+    try {
+      const ln = nativePlugin("LocalNotifications");
+      if (!ln) return;
+      const now = await ln.checkPermissions();
+      if (now && /^prompt/.test(now.display || "")) await ln.requestPermissions();
+    } catch (e) {}
+  }
+
+  audio.addEventListener("loadedmetadata", () => {
+    told.actions();
+    told.metadata(queue[index]);
+    told.position(true);
+  });
+  audio.addEventListener("playing", () => {
+    told.state("playing"); told.position(true); mayNotify();
+  });
+  audio.addEventListener("pause", () => { told.state("paused"); told.position(true); });
+  audio.addEventListener("seeked", () => told.position(true));
+  audio.addEventListener("ratechange", () => told.position(true));
+
+  $("libFind").addEventListener("input", (e) => {
+    libFind = e.target.value;
+    drawLib();
+  });
+  $("libFindClear").addEventListener("click", () => {
+    libFind = "";
+    $("libFind").value = "";
+    $("libFind").focus();
+    drawLib();
+  });
+
+  /* ==========================================================
+     WHAT IT IS PLAYING THROUGH
+
+     The WebView cannot know: Chrome on Android does not enumerate
+     audio outputs at all. Android does know, and a small native
+     class asks it — see scripts/android-audio-out.py. Everywhere
+     else there is no such class, nothing is asked, and nothing is
+     shown. A label that guesses would be worse than none.
+
+     The strip only says anything when the sound is going somewhere
+     other than the phone's own speaker, because that is the part
+     worth knowing and the artist's name is worth more than
+     "speaker". The full screen has room, so it says either.
+     ========================================================== */
+
+  const audioOut = nativePlugin("AudioOut");
+  let outNow = { kind: "", name: "" };
+  let outTimer = 0;
+
+  function paintOut() {
+    const named = outNow.name || {
+      bluetooth: "Bluetooth", wired: "Headphones", speaker: "Phone speaker",
+    }[outNow.kind] || "";
+
+    const away = outNow.kind && outNow.kind !== "speaker";
+
+    $("nOut").hidden = !outNow.kind;
+    $("nOut").dataset.kind = outNow.kind;
+    $("nOut").classList.toggle("away", !!away);
+    $("nOutName").textContent = named;
+
+    $("mOut").hidden = !away;
+    $("mOut").dataset.kind = outNow.kind;
+    $("mArtist").hidden = !!away;
+    $("mOutName").textContent = named;
+  }
+
+  async function readOut() {
+    if (!audioOut) return;
+    try {
+      const r = await audioOut.current();
+      if (!r) return;
+      const kind = r.kind || "", name = r.name || "";
+      if (kind === outNow.kind && name === outNow.name) return;
+      outNow = { kind, name };
+      paintOut();
+    } catch (e) {
+      // an older phone, or a plugin that is not there: say nothing
+    }
+  }
+
+  function watchOut() {
+    clearInterval(outTimer);
+    if (!audioOut) return;
+    // Only while there is something to hear and someone to see it.
+    outTimer = setInterval(() => {
+      if (document.visibilityState !== "visible" || audio.paused) return;
+      readOut();
+    }, 5000);
+  }
+
+  if (audioOut) {
+    audio.addEventListener("playing", readOut);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") readOut();
+    });
+    watchOut();
+    readOut();
+  }
+
+  /* ==========================================================
+     PLAYLISTS
+
+     A playlist is a way of finding songs, not a second kind of
+     thing: the server hands them back in the same shape a search
+     does, the rows are the same rows, and playing one goes down
+     the same path. Nothing here knows how to play anything.
+     ========================================================== */
+
+  const plist = $("plist");
+  let plSongs = [];
+
+  const listId = (ref) => AartiPlaylists.id(ref);
+  const playlistClient = AartiPlaylists.create(api);
+  const songRequests = new Map();
+  async function discoverSongs(query) {
+    const key=query.trim().toLocaleLowerCase();const cached=songRequests.get(key);
+    if(cached && Date.now()-cached.at<120000)return cached.promise;
+    const promise=(async()=>{
+      const r=await api('/api/search?q='+encodeURIComponent(query));
+      if(!r.ok)throw new Error('Songs could not load');
+      const data=await r.json();if(data.error||!Array.isArray(data.results))throw new Error('Invalid response');return data;
+    })();
+    songRequests.set(key,{at:Date.now(),promise});
+    while(songRequests.size>32)songRequests.delete(songRequests.keys().next().value);
+    try{return await promise;}catch(e){songRequests.delete(key);throw e;}
+  }
+  const discoveryOptions = {
+    profile: () => AartiProfile.get(),
+    artist: () => (store.recents[0]?.artist || '').split(/[,|&]/)[0].trim().slice(0,80),
+    playlists: query => playlistClient.search(query), songs: discoverSongs,
+    openPlaylist: (id,known,from) => openPlaylist(id,known,from),
+    playSongs: (songs,at) => chooseSong(songs,at)
+  };
+  const discovery=AartiDiscovery({...discoveryOptions,host:$('discovery')});
+  const searchDiscovery=AartiDiscovery({...discoveryOptions,host:$('searchDiscovery'),mode:'songs'});
+  const listDiscovery=AartiDiscovery({...discoveryOptions,host:$('listDiscovery'),mode:'playlists'});
+  addEventListener('aarti-profile-change',()=>{
+    discovery.refresh(true);searchDiscovery.refresh(true);listDiscovery.refresh(true);drawHome();
+  });
+
+  // Suggestions reuse the existing search API; no new bot endpoint needed.
+  let suggestSerial=0,suggestTimer=0,composing=false;
+  const suggestions=$('searchSuggestions'),queryInput=$('q');
+  function hideSuggestions(){++suggestSerial;clearTimeout(suggestTimer);suggestions.hidden=true;queryInput.setAttribute('aria-expanded','false');}
+  queryInput.setAttribute('aria-controls','searchSuggestions');queryInput.setAttribute('aria-expanded','false');
+  function suggestionRows(terms){
+    suggestions.replaceChildren();
+    for(const term of [...new Set(terms)].slice(0,7)){
+      const b=document.createElement('button');b.type='button';b.textContent=term;
+      b.addEventListener('click',()=>{hideSuggestions();search(term);});suggestions.append(b);
+    }
+    suggestions.hidden=!suggestions.children.length;queryInput.setAttribute('aria-expanded',String(!suggestions.hidden));
+  }
+  function suggest(){
+    hideSuggestions();const term=queryInput.value.trim();$('searchDiscovery').hidden=!!term;
+    if(!term){$('results').replaceChildren();$('searchEmpty').hidden=true;searchDiscovery.refresh();return;}
+    if(composing||term.length<2||listId(term))return;
+    const mine=suggestSerial;
+    const local=[...store.history,...(AartiProfile.get()?.artists||[])].filter(x=>x.toLocaleLowerCase().includes(term.toLocaleLowerCase()));
+    suggestionRows(local);
+    suggestTimer=setTimeout(async()=>{
+      try{const data=await discoverSongs(term);if(mine!==suggestSerial)return;
+        suggestionRows([...local,...data.results.flatMap(x=>[x.title,x.artist]).filter(Boolean)]);
+      }catch(_){if(mine!==suggestSerial)return;if(!local.length){suggestions.replaceChildren();const p=document.createElement('p');p.className='suggest-status';p.textContent='Suggestions unavailable. You can still submit your search.';suggestions.append(p);suggestions.hidden=false;}}
+    },400);
+  }
+  queryInput.addEventListener('input',suggest);
+  queryInput.addEventListener('compositionstart',()=>{composing=true;hideSuggestions();});
+  queryInput.addEventListener('compositionend',()=>{composing=false;suggest();});
+  queryInput.addEventListener('keydown',e=>{if(e.key==='Escape')hideSuggestions();if(e.key==='ArrowDown'&&!suggestions.hidden){e.preventDefault();suggestions.querySelector('button')?.focus();}});
+  suggestions.addEventListener('keydown',e=>{const items=[...suggestions.querySelectorAll('button')];const at=items.indexOf(document.activeElement);if(e.key==='Escape'){hideSuggestions();queryInput.focus();}if(['ArrowDown','ArrowUp'].includes(e.key)){e.preventDefault();(items[at+(e.key==='ArrowDown'?1:-1)]||queryInput).focus();}});
+  document.addEventListener('pointerdown',e=>{if(!e.target.closest('#searchSuggestions,#searchForm'))hideSuggestions();},{passive:true});
+
+  let playlistRequest = 0, finderRequest = 0;
+
+  function playlistMessage(head, message) {
+    $("plEmpty").hidden = false;
+    $("plEmpty").querySelector("h3").textContent = head;
+    $("plEmpty").querySelector("p").textContent = message;
+  }
+
+  function rememberList(p) {
+    if (!p || !p.id) return;
+    store.lists = [{ id: p.id, title: p.title, thumb: p.thumb, by: p.by }]
+      .concat(store.lists.filter((x) => x.id !== p.id))
+      .slice(0, 12);
+    save();
+    drawHome();
+  }
+
+  function openPl(from) {
+    if (plist.classList.contains("open")) return;
+    if (growFrom(plist, from)) { cameFrom.set(plist, from); settle(plist); }
+    else cameFrom.delete(plist);
+    plist.classList.add("open");
+    plist.setAttribute("aria-hidden", "false");
+    document.body.classList.add("locked");
+    opened(plist, closePl);
+  }
+  function closePl(how) {
+    if (!plist.classList.contains("open")) return;
+    ++playlistRequest;
+    // Back into the card it came out of — unless that card has been
+    // scrolled away or the playlist was opened from a pasted link,
+    // in which case there is nothing to go back into and it slides.
+    if (how === "drag") plist.classList.remove("growing");
+    else growFrom(plist, cameFrom.get(plist));
+    plist.classList.remove("open");
+    plist.setAttribute("aria-hidden", "true");
+    if (!now.classList.contains("open")) document.body.classList.remove("locked");
+    closed(plist);
+  }
+  $("plClose").addEventListener("click", () => closePl());
+  draggable(plist, () => closePl("drag"), { threshold: 120 });
+
+  async function openPlaylist(ref, known, from) {
+    const id = AartiPlaylists.id(ref, true);
+    const request = ++playlistRequest;
+    openPl(from);
+    $("plRows").innerHTML = "";
+    $("plEmpty").hidden = true;
+    $("plLoading").hidden = false;
+    plSongs = [];
+    $("plPlay").disabled = $("plShuffle").disabled = true;
+    $("plTitle").textContent = (known && known.title) || "Playlist";
+    $("plBy").textContent = (known && known.by) || "";
+    $("plArt").src = (known && known.thumb) || "";
+    $("plBg").style.backgroundImage = known && known.thumb ? 'url("' + known.thumb + '")' : "";
+    try {
+      const p = await playlistClient.open(id);
+      if (request !== playlistRequest) return;
+      plSongs = p.results;
+      $("plPlay").disabled = $("plShuffle").disabled = !plSongs.length;
+      $("plTitle").textContent = p.title || "Playlist";
+      $("plBy").textContent = p.by || (plSongs.length + " songs");
+      if (p.thumb) {
+        $("plArt").src = p.thumb;
+        $("plBg").style.backgroundImage = 'url("' + p.thumb + '")';
+      }
+      if (!plSongs.length) playlistMessage("This playlist is empty", "No playable songs were returned for this playlist.");
+      fill($("plRows"), plSongs);
+      rememberList({ id: p.id || id, title: p.title, thumb: p.thumb, by: p.by });
+    } catch (error) {
+      if (request !== playlistRequest) return;
+      playlistMessage(...AartiPlaylists.describe(error));
+    } finally {
+      if (request === playlistRequest) $("plLoading").hidden = true;
+    }
+  }
+
+  $("plPlay").addEventListener("click", () => {
+    if (!plSongs.length) return;
+    buzz();
+    queue = plSongs.slice();
+    playAt(0);
+  });
+  $("plShuffle").addEventListener("click", () => {
+    if (!plSongs.length) return;
+    buzz();
+    const shuffled = plSongs.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    queue = shuffled;
+    playAt(0);
+  });
+
+  /* ---------- pasting a link to one ---------- */
+
+  $("plAdd").addEventListener("click", () => {
+    buzz();
+    $("plInput").value = "";
+    sheet($("plSheet"), true);
+    setTimeout(() => $("plInput").focus(), 260);
+  });
+  $("plCancel").addEventListener("click", () => sheet($("plSheet"), false));
+  $("plSheet").addEventListener("click", (e) => {
+    if (e.target === $("plSheet")) sheet($("plSheet"), false);
+  });
+  $("plForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const ref = $("plInput").value.trim();
+    if (!AartiPlaylists.id(ref, true)) { toast("Paste a valid YouTube playlist link or ID"); return; }
+    sheet($("plSheet"), false);
+    openPlaylist(ref);
+  });
+
+  /* ---------- the rail on the home screen ---------- */
+
+  function drawLists() {
+    const seen = {};
+    const all = []
+      .concat(window.AARTI_PLAYLISTS || [])
+      .map((p) => ({ id: p.id, title: p.name || p.title || "Playlist", thumb: p.thumb, by: "" }))
+      .concat(store.lists || [])
+      .filter((p) => p && p.id && !seen[p.id] && (seen[p.id] = 1));
+
+    $("plBlock").hidden = !all.length;
+    const rail = $("plRail");
+    rail.innerHTML = "";
+
+    all.forEach((p) => {
+      const card = document.createElement("button");
+      card.className = "card";
+      const img = document.createElement("img");
+      img.loading = "lazy";
+      img.src = p.thumb || "";
+      const t = document.createElement("div");
+      t.className = "t";
+      t.textContent = p.title;                  // arbitrary text — never innerHTML
+      card.append(img, t);
+      card.addEventListener("click", () => { buzzPick(); openPlaylist(p.id, p, card); });
+      rail.appendChild(card);
+    });
+  }
+
+  /* ---------- finding playlists -----------------------------
+     A section of its own, because looking for a playlist is a
+     different errand from looking for a song: you are choosing
+     an hour of listening, not a track.
+
+     What comes back is only the cards — name, who made it, how
+     many songs. Opening one is a second call, and it goes through
+     exactly the same openPlaylist() as a card on the home screen
+     and a pasted link, so there is one playlist screen and one way
+     of playing out of it.                                      */
+
+  const TRY = ["Bhajan", "Aarti", "Arijit Singh", "Krishna", "Old Hindi",
+               "Lofi", "Garba", "Kirtan"];
+  let shown = [];          // the last playlist search
+
+  function tile(p, i) {
+    const el = document.createElement("button");
+    el.className = "tile";
+
+    const img = document.createElement("img");
+    img.loading = "lazy";
+    img.alt = "";
+    img.src = p.thumb || "";
+
+    const t = document.createElement("div");
+    t.className = "t";
+    t.textContent = p.title || "Playlist";      // arbitrary — never innerHTML
+
+    const sub = document.createElement("div");
+    sub.className = "s";
+    sub.textContent = [p.by, p.count ? p.count + " songs" : ""]
+      .filter(Boolean).join(" · ");
+
+    el.append(img, t, sub);
+    stagger(el, i);
+    // The tile is what the playlist screen grows out of.
+    el.addEventListener("click", () => { buzzPick(); openPlaylist(p.id, p, el); });
+    return el;
+  }
+
+  function paintTiles(box, list) {
+    box.innerHTML = "";
+    list.forEach((p, i) => box.appendChild(tile(p, i)));
+  }
+
+  function drawFinder() {
+    // Somewhere to start: a few words, and whatever has been opened
+    // before. Both disappear once there is a search on screen.
+    const chips = $("lqChips");
+    if (!chips.children.length) {
+      TRY.forEach((term) => {
+        const c = document.createElement("button");
+        c.className = "chip";
+        c.textContent = term;
+        c.addEventListener("click", () => findLists(term));
+        chips.appendChild(c);
+      });
+    }
+
+    const mine = (store.lists || []).slice(0, 6);
+    const idle = !shown.length;
+    $("lqBlock").hidden = !idle;
+    $("lqMineBlock").hidden = !idle || !mine.length;
+    if (idle && mine.length) paintTiles($("lqMine"), mine);
+  }
+
+  function noLists(head, msg) {
+    const box = $("lqEmpty");
+    box.hidden = false;
+    box.querySelector("h3").textContent = head;
+    box.querySelector("p").textContent = msg;
+  }
+
+  async function findLists(term) {
+    $("listDiscovery").hidden=!!term;
+    term = (term || "").trim();
+    if (!term) return;
+    const request = ++finderRequest;
+
+    // A link pasted in here means that playlist, not a search for
+    // its address — the same rule the song search follows.
+    const asList = listId(term);
+    if (asList) { $("lq").value = ""; $("lqLoading").hidden = true; openPlaylist(asList); return; }
+
+    $("lq").value = term;
+    $("lq").blur();
+    $("lqEmpty").hidden = true;
+    $("lqBlock").hidden = true;
+    $("lqMineBlock").hidden = true;
+    $("lqResults").innerHTML = "";
+    $("lqLoading").hidden = false;
+    shown = [];
+
+    try {
+      const data = await playlistClient.search(term);
+      if (request !== finderRequest) return;
+      shown = data.results;
+      if (!shown.length) {
+        return noLists("No playlists for that", "Try a shorter word, or paste a playlist link.");
+      }
+      paintTiles($("lqResults"), shown);
+    } catch (err) {
+      if (request !== finderRequest) return;
+      noLists(...AartiPlaylists.describe(err));
+    } finally {
+      if (request === finderRequest) {
+        $("lqLoading").hidden = true;
+        drawFinder();
+      }
+    }
+  }
+
+  $("listForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    findLists($("lq").value);
+  });
+  // Clearing the box puts the starting points back.
+  $("lq").addEventListener("input", () => {
+    if ($("lq").value.trim()) return;
+    ++finderRequest;
+    $("listDiscovery").hidden=false; listDiscovery.refresh();
+    $("lqLoading").hidden = true;
+    shown = [];
+    $("lqResults").innerHTML = "";
+    $("lqEmpty").hidden = true;
+    drawFinder();
+  });
+  $("lqAdd").addEventListener("click", () => {
+    buzz();
+    $("plInput").value = "";
+    sheet($("plSheet"), true);
+    setTimeout(() => $("plInput").focus(), 260);
+  });
+
+  /* ---------- whose app this is -----------------------------
+     A line at the end of the library rather than a screen of its
+     own. Both open outside the app: an app link first, the web
+     page if that finds nothing.                                */
+
+  document.querySelectorAll(".handle").forEach((a) => {
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      buzz();
+      openOutside(a.getAttribute("href"), a.dataset.app || "");
+    });
+  });
+
+  /* ---------- start ----------------------------------------- */
+
+  paintModes();
+  accState();
+  // One attempt at startup. It fails quietly on a server that has
+  // never heard of these routes.
+  pull().catch(() => {});
+
+  /* Coming back to the app is the other moment worth asking. A
+     favourite added in the chat, on another phone, or from the
+     notification while this was in the background, is only news
+     once someone looks — and a pull at startup alone means waiting
+     for a cold start to see it.
+
+     Held to once every few seconds so flicking between two apps
+     does not turn into a stream of requests. */
+  let lastPull = 0;
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    if (Date.now() - lastPull < 4000) return;
+    lastPull = Date.now();
+    pull().catch(() => {});
+  });
+  tab("Home");
+  AartiProfile.start();
+  const personalLibrary=AartiPersonalLibrary({
+    play: (songs,at)=>chooseSong(songs,at),
+    readStore:()=>store,
+    reload:()=>{load();AartiProfile.reload();paintTheme();paintModes();paintFavButtons();drawHome();drawLib();},
+    native:()=>nativePlugin('PersonalLibrary'),
+    toast
+  });
+  restorePlayback();
+
+  // Opening visual has its own short timer in HTML and never gates startup.
+})();
