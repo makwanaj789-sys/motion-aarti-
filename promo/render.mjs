@@ -35,6 +35,7 @@ async function frameAt(page, t) {
   }, t);
 }
 
+const MB = +(process.env.MB || 1), SHUTTER = +(process.env.SHUTTER || 0.5);
 const browser = await chromium.launch({ args: ['--disable-gpu-vsync', '--force-color-profile=srgb'] });
 if (mode === 'stills') {
   const page = await newPage(browser);
@@ -58,11 +59,21 @@ if (mode === 'stills') {
     while (next < N) {
       const i = next++;
       const file = path.join(out, `f${String(i).padStart(4, '0')}.jpg`);
-      if (process.env.RESUME && fs.existsSync(file) && fs.statSync(file).size > 10000) continue;
+      if (process.env.RESUME && fs.existsSync(file) && (MB > 1 || fs.statSync(file).size > 10000)) continue;
       for (let attempt = 0; ; attempt++) {
         try {
-          await frameAt(page, i / TL.fps);
-          await page.screenshot({ path: file, type: 'jpeg', quality: 95, timeout: 180000 });
+          if (MB > 1) {   // motion blur: n sub-frames across the shutter, averaged later by mb_avg.py
+            const m = (TL.blur || []).reduce((a, [s, e, k]) => (i / TL.fps >= s && i / TL.fps <= e ? Math.max(a, k) : a), 1);
+            const open = Math.min(0.95, SHUTTER * m);
+            for (let k = 0; k < MB; k++) {
+              await frameAt(page, Math.max(0, (i + (k / (MB - 1) - 0.5) * open) / TL.fps));
+              await page.screenshot({ path: file.replace('.jpg', `_${k}.jpg`), type: 'jpeg', quality: 95, timeout: 180000 });
+            }
+            fs.writeFileSync(file, 'mb');
+          } else {
+            await frameAt(page, i / TL.fps);
+            await page.screenshot({ path: file, type: 'jpeg', quality: 95, timeout: 180000 });
+          }
           break;
         } catch (e) { if (attempt >= 2) throw e; console.log('retry frame', i, e.message.split('\n')[0]); }
       }
