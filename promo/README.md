@@ -1,0 +1,38 @@
+# AartiMusic promo pipeline
+
+Renders `output/AartiMusic_Promo_1080x1920.mp4` from the AartiMusic APK.
+
+    APK=path/to/AartiMusic_1.2.apk ./build.sh work
+
+1. `prep.py` extracts the app's Capacitor web layer (`assets/public`) and the launcher mark from the APK.
+2. `make_art.py` draws original cover art for the demo songs (`songs.json`).
+3. `capture.mjs` runs the real app UI in Chromium against a local mock of its server
+   (`harness.mjs`) and captures every screen state at 4x, plus element rectangles.
+4. `compose.html` / `compose.js` hold the whole timeline: phone camera, UI layers, copy,
+   background. `render.mjs` renders it at 2160x3840 and writes `timeline.json` (scenes + sound cues).
+5. `audio.py` synthesizes the soundtrack and sound design from `timeline.json`, sidechains,
+   and masters to -14 LUFS.
+6. `build.sh` downscales with Lanczos, encodes H.264 High + AAC, and makes the cover and contact sheet.
+
+Needs Node with Playwright (Chromium), Python with numpy/scipy/pillow, and ffmpeg.
+
+## 16:9 YouTube version with narration
+
+    APK=path/to/AartiMusic_1.2.apk ./fetch_tts.sh tts && TTS=tts ./build169.sh work169
+
+- `vo.py` writes the narration with Kokoro-82M (local ONNX, female voice blend), checks every
+  line with PocketSphinx and force-aligns each word into `vo.json`.
+- `compose169.html` / `compose169.js` anchor every headline and transition to those word times.
+- `audio169.py` builds the soundtrack and sound design from the same cues, ducks the music under
+  the voice (with a dynamic cut in the speech band) and masters to -14 LUFS, true peak under -1 dBTP.
+- `qa_voice.py` reports the voice-to-bed ratio per line and speech recognition on the final mix.
+
+## v2.0 (blue, 16:9, creator credit)
+
+    APK=... ./fetch_tts.sh tts && TTS=tts ./build_v2.sh work_v2
+
+- `capture_v2.mjs` recaptures every screen in the app's own "Midnight" (teal) theme, plus 8x macro
+  crops (`MACRO=1`); `capture_themes.mjs` captures Home in all seven themes.
+- `vo2.py` writes the v2 narration (with "Ajay" set phonetically as "uh-JAY") and word times (`vo2.json`).
+- `compose_v2.html` / `compose_v2.js` hold the whole v2 film; `audio_v2.py` the new score, sound design and mix.
+- `render.mjs` supports `RESUME=1` and retries slow frames.

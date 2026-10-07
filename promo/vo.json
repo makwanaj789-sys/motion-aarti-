@@ -1,0 +1,408 @@
+{
+ "lines": [
+  {
+   "id": "hook",
+   "text": "What does your day sound like?",
+   "start": 0.18,
+   "end": 1.623,
+   "words": [
+    {
+     "w": "what",
+     "start": 0.18,
+     "end": 0.38
+    },
+    {
+     "w": "does",
+     "start": 0.38,
+     "end": 0.54
+    },
+    {
+     "w": "your",
+     "start": 0.54,
+     "end": 0.63
+    },
+    {
+     "w": "day",
+     "start": 0.63,
+     "end": 0.88
+    },
+    {
+     "w": "sound",
+     "start": 0.88,
+     "end": 1.23
+    },
+    {
+     "w": "like",
+     "start": 1.23,
+     "end": 1.61
+    }
+   ],
+   "heard": "what is your day sound like",
+   "missing": [
+    "does"
+   ]
+  },
+  {
+   "id": "meet",
+   "text": "Meet Aarti Music.",
+   "start": 2.073,
+   "end": 3.454,
+   "words": [
+    {
+     "w": "meet",
+     "start": 2.073,
+     "end": 2.503
+    },
+    {
+     "w": "aarti",
+     "start": 2.503,
+     "end": 2.823
+    },
+    {
+     "w": "music",
+     "start": 2.823,
+     "end": 3.443
+    }
+   ],
+   "heard": "meet our team you zack",
+   "missing": []
+  },
+  {
+   "id": "mood",
+   "text": "Fresh picks, made for your mood.",
+   "start": 4.054,
+   "end": 5.901,
+   "words": [
+    {
+     "w": "fresh",
+     "start": 4.054,
+     "end": 4.444
+    },
+    {
+     "w": "picks",
+     "start": 4.444,
+     "end": 4.864
+    },
+    {
+     "w": "made",
+     "start": 4.864,
+     "end": 5.144
+    },
+    {
+     "w": "for",
+     "start": 5.144,
+     "end": 5.284
+    },
+    {
+     "w": "your",
+     "start": 5.284,
+     "end": 5.414
+    },
+    {
+     "w": "mood",
+     "start": 5.414,
+     "end": 5.894
+    }
+   ],
+   "heard": "fresh takes made for your mood",
+   "missing": [
+    "picks"
+   ]
+  },
+  {
+   "id": "search",
+   "text": "Search any song.",
+   "start": 6.401,
+   "end": 7.528,
+   "words": [
+    {
+     "w": "search",
+     "start": 6.401,
+     "end": 6.801
+    },
+    {
+     "w": "any",
+     "start": 6.801,
+     "end": 6.971
+    },
+    {
+     "w": "song",
+     "start": 6.971,
+     "end": 7.521
+    }
+   ],
+   "heard": "search any song",
+   "missing": []
+  },
+  {
+   "id": "play",
+   "text": "Find it, tap it, and just press play.",
+   "start": 7.828,
+   "end": 10.101,
+   "words": [
+    {
+     "w": "find",
+     "start": 7.828,
+     "end": 8.218
+    },
+    {
+     "w": "it",
+     "start": 8.218,
+     "end": 8.408
+    },
+    {
+     "w": "tap",
+     "start": 8.408,
+     "end": 8.728
+    },
+    {
+     "w": "it",
+     "start": 8.728,
+     "end": 9.028
+    },
+    {
+     "w": "and",
+     "start": 9.028,
+     "end": 9.178
+    },
+    {
+     "w": "just",
+     "start": 9.178,
+     "end": 9.368
+    },
+    {
+     "w": "press",
+     "start": 9.368,
+     "end": 9.618
+    },
+    {
+     "w": "play",
+     "start": 9.618,
+     "end": 10.088
+    }
+   ],
+   "heard": "find it happened and just press play",
+   "missing": [
+    "tap"
+   ]
+  },
+  {
+   "id": "lists",
+   "text": "Build playlists for every mood, and keep your favourites close.",
+   "start": 10.901,
+   "end": 14.431,
+   "words": [
+    {
+     "w": "build",
+     "start": 10.901,
+     "end": 11.201
+    },
+    {
+     "w": "playlists",
+     "start": 11.201,
+     "end": 11.781
+    },
+    {
+     "w": "for",
+     "start": 11.781,
+     "end": 11.961
+    },
+    {
+     "w": "every",
+     "start": 11.961,
+     "end": 12.241
+    },
+    {
+     "w": "mood",
+     "start": 12.241,
+     "end": 12.641
+    },
+    {
+     "w": "and",
+     "start": 12.641,
+     "end": 13.081
+    },
+    {
+     "w": "keep",
+     "start": 13.081,
+     "end": 13.311
+    },
+    {
+     "w": "your",
+     "start": 13.311,
+     "end": 13.411
+    },
+    {
+     "w": "favourites",
+     "start": 13.411,
+     "end": 13.921
+    },
+    {
+     "w": "close",
+     "start": 13.921,
+     "end": 14.421
+    }
+   ],
+   "heard": "dell playlists for every new and and keep your favorites close",
+   "missing": [
+    "build",
+    "mood"
+   ]
+  },
+  {
+   "id": "tg",
+   "text": "Connect Telegram, and your favourites follow you to any phone.",
+   "start": 15.031,
+   "end": 18.446,
+   "words": [
+    {
+     "w": "connect",
+     "start": 15.031,
+     "end": 15.371
+    },
+    {
+     "w": "telegram",
+     "start": 15.371,
+     "end": 16.041
+    },
+    {
+     "w": "and",
+     "start": 16.321,
+     "end": 16.441
+    },
+    {
+     "w": "your",
+     "start": 16.441,
+     "end": 16.541
+    },
+    {
+     "w": "favourites",
+     "start": 16.541,
+     "end": 17.101
+    },
+    {
+     "w": "follow",
+     "start": 17.101,
+     "end": 17.401
+    },
+    {
+     "w": "you",
+     "start": 17.401,
+     "end": 17.591
+    },
+    {
+     "w": "to",
+     "start": 17.591,
+     "end": 17.711
+    },
+    {
+     "w": "any",
+     "start": 17.711,
+     "end": 17.931
+    },
+    {
+     "w": "phone",
+     "start": 17.931,
+     "end": 18.431
+    }
+   ],
+   "heard": "connect telegram and your favorites follow you to any phone",
+   "missing": []
+  },
+  {
+   "id": "themes",
+   "text": "Pick from seven themes, and make it yours.",
+   "start": 19.046,
+   "end": 21.552,
+   "words": [
+    {
+     "w": "pick",
+     "start": 19.046,
+     "end": 19.256
+    },
+    {
+     "w": "from",
+     "start": 19.256,
+     "end": 19.436
+    },
+    {
+     "w": "seven",
+     "start": 19.436,
+     "end": 19.876
+    },
+    {
+     "w": "themes",
+     "start": 19.876,
+     "end": 20.406
+    },
+    {
+     "w": "and",
+     "start": 20.546,
+     "end": 20.696
+    },
+    {
+     "w": "make",
+     "start": 20.696,
+     "end": 20.886
+    },
+    {
+     "w": "it",
+     "start": 20.886,
+     "end": 20.966
+    },
+    {
+     "w": "yours",
+     "start": 20.966,
+     "end": 21.546
+    }
+   ],
+   "heard": "heck from seven teams and make it yours",
+   "missing": [
+    "pick",
+    "themes"
+   ]
+  },
+  {
+   "id": "end",
+   "text": "Aarti Music. Your daily sound.",
+   "start": 22.402,
+   "end": 24.448,
+   "words": [
+    {
+     "w": "aarti",
+     "start": 22.402,
+     "end": 22.752
+    },
+    {
+     "w": "music",
+     "start": 22.752,
+     "end": 23.332
+    },
+    {
+     "w": "your",
+     "start": 23.422,
+     "end": 23.542
+    },
+    {
+     "w": "daily",
+     "start": 23.542,
+     "end": 23.882
+    },
+    {
+     "w": "sound",
+     "start": 23.882,
+     "end": 24.432
+    }
+   ],
+   "heard": "party music your daily sound",
+   "missing": []
+  }
+ ],
+ "duration": 24.448,
+ "words": 59,
+ "voice": {
+  "af_heart": 0.8,
+  "hf_alpha": 0.2
+ },
+ "speed": 0.88
+}

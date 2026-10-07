@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:Sora;src:url(app/fonts/sora-400-latin.woff2) format('woff2');font-weight:100 800;}
+html,body{margin:0;background:#000;overflow:hidden}
+#stage{position:relative;overflow:hidden;background:#000;font-family:Sora,sans-serif;color:#F2F8FF}
+.abs{position:absolute;left:0;top:0}
+#world{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0}
+.el{position:absolute;transform-origin:50% 50%}
+.lay{position:absolute;overflow:hidden}
+.lay img{position:absolute;left:0;top:0;display:block}
+.txt{position:absolute;white-space:nowrap;transform-origin:0 50%}
+#fx{position:absolute;left:0;top:0}
+#flash{position:absolute;inset:0;pointer-events:none}
+#fade{position:absolute;inset:0;background:#000;z-index:100}
+#grain{position:absolute;inset:0;opacity:.035;mix-blend-mode:overlay;background-size:256px 256px;z-index:50}
+.hand{position:absolute;width:64px;height:64px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.6));z-index:40}
+</style></head>
+<body><div id="stage"><div id="world"></div><canvas id="fx"></canvas><div id="flash"></div><div id="grain"></div><div id="fade"></div></div>
+<script src="teaser2.js"></script></body></html>

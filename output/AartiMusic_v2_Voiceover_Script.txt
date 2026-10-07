@@ -1,0 +1,41 @@
+AARTIMUSIC — PROMO v2.0 (16:9 YouTube)
+Final female voiceover script
+=====================================
+
+Voice: female, young adult, warm and clear, light Indian-English colour
+       Kokoro-82M v1.0 neural voice, run locally (80% af_heart + 20% hf_alpha)
+Pronunciation: "Aar-tee Music" /ˈɑːɹti mjuːzɪk/   ·   "Ajay" = "uh-JAY" /ɐdʒˈeɪ/
+Length: 70 words · narration 0.18 s – 29.18 s · film 30.40 s (912 frames at 30 fps)
+
+
+TIME     NARRATION                                                        ON SCREEN
+-------  ---------------------------------------------------------------  ---------------------------------------
+ 0.18 s  Some songs find you.                                             SOME SONGS / FIND YOU.  (a card finds you)
+ 1.79 s  Others, you go looking for.                                      OTHERS, / YOU GO LOOKING FOR.  (search field)
+ 3.82 s  Aarti Music does both.                                           app icon + AARTIMUSIC (lands on "Aarti")
+ 5.93 s  Fresh discoveries, tuned to your mood.                           FRESH DISCOVERIES, / TUNED TO / YOUR MOOD
+ 8.55 s  Or just search any song,                                         SEARCH / ANY SONG.  (typing "om jai")
+10.20 s  and with one tap, it's playing.                                  ONE TAP. / IT'S PLAYING.
+12.59 s  Build a playlist for every moment.                               BUILD A PLAYLIST / FOR EVERY MOMENT
+14.88 s  Keep your favourites in sync with the Aarti Music bot on Telegram. KEEP YOUR FAVOURITES / IN SYNC / @aartimusic_bot
+19.55 s  Make it yours, with seven themes.                                MAKE IT  YOURS / SEVEN  THEMES
+22.49 s  Made with love by Ajay, for everyone who lives through music.    MADE WITH LOVE BY / AJAY / [Instagram icon] @h81t6
+27.14 s  Aarti Music. Your daily sound.                                   app icon + AARTIMUSIC / "Your daily sound"
+
+Creator reveal: "AJAY" lands at 23.51 s (the spoken name); the Instagram glyph
+resolves 6 frames later, and "@h81t6" slides out of it 3 frames after that.
+It stays on screen until 26.3 s.
+
+
+VERIFIED AARTIMUSIC FEATURES SHOWN (real app UI from AartiMusic_1.2.apk,
+in the app's own "Midnight" theme, with demo songs and original artwork)
+-----------------------------------------------------------------------
+- Home / Discover: "Made for you" mood chips (For you, Trending, Hindi ...) that change the picks
+- Search: search field, typing, suggestions, results, tapping a song
+- Full-screen player: artwork, play/pause, progress, shuffle, repeat, Up next
+- Playlists: Create -> "A playlist of your own" -> the new playlist
+- Favourites: the heart on a song
+- Telegram: "Connect Telegram" syncs favourites with @aartimusic_bot
+- Themes: all seven built-in themes (Midnight, Indigo, Grove, Violet, Neon, Ruby, Amber)
+- Brand: the app's "Midnight" launcher icon, Sora font, the tagline "YOUR DAILY SOUND"
+- Creator: the app's own "Made by" footer links Instagram @h81t6
