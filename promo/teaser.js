@@ -170,7 +170,7 @@ window.renderAt = function (t) {
   // ============ 2. the greeting the app opens with
   if (t >= T.greet[0] - 0.1 && t < T.typeStart + 0.8) {
     const up = eIO3(seg(t, T.greetUp, T.greetUp + 0.42));
-    const words = ['Good', 'evening,', 'Priya'], size = W < H ? 64 : 76, sp = measure(' ', size, 700);
+    const words = ['Good', 'evening,', 'Ajay'], size = W < H ? 64 : 76, sp = measure(' ', size, 700);
     const ws = words.map((w) => measure(w, size, 700, -0.01)), IS = size * 0.95, gap = size * 0.4;
     const total = IS + gap + ws.reduce((a, b) => a + b, 0) + sp * 2;
     const yy = lerp(0, -FH * 1.15 - size * 0.4, up), sc = lerp(1, 0.78, up), fadeOut = seg(t, T.typeStart + 0.1, T.typeStart + 0.5);
