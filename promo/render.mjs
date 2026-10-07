@@ -64,9 +64,9 @@ if (mode === 'stills') {
         try {
           if (MB > 1) {   // motion blur: n sub-frames across the shutter, averaged later by mb_avg.py
             const m = (TL.blur || []).reduce((a, [s, e, k]) => (i / TL.fps >= s && i / TL.fps <= e ? Math.max(a, k) : a), 1);
-            const open = Math.min(0.95, SHUTTER * m);
-            for (let k = 0; k < MB; k++) {
-              await frameAt(page, Math.max(0, (i + (k / (MB - 1) - 0.5) * open) / TL.fps));
+            const open = Math.min(0.95, SHUTTER * m), n = m > 1 ? Math.min(32, Math.round(MB * m * 2.2)) : MB;   // whips need dense sampling or they strobe
+            for (let k = 0; k < n; k++) {
+              await frameAt(page, Math.max(0, (i + (k / (n - 1) - 0.5) * open) / TL.fps));
               await page.screenshot({ path: file.replace('.jpg', `_${k}.jpg`), type: 'jpeg', quality: 95, timeout: 180000 });
             }
             fs.writeFileSync(file, 'mb');
