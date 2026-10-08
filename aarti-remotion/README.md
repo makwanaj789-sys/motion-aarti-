@@ -14,6 +14,7 @@ Rendered output: `../output/AartiMusic_Promo_Reference_16x9_1920x1080_60fps.mp4`
 | `src/Promo.tsx` | the whole timeline as one composition (open, arcs, greeting and field under one camera, press, results, waveform, outro) |
 | `src/fx.tsx` | palette (the app's teal theme), font loading and measuring, the `MotionBlur` wrapper, light trails, icons, hand |
 | `src/data.ts` | query and results content (the app's demo catalogue) |
+| `audio/ringout_track.py` | plays a supplied soundtrack uncut to its end, then lets it ring out (reverb tail) to the promo length — used for the `_RefMusic` cut |
 | `audio/extend_track.py` | fits a supplied soundtrack (e.g. the reference's track) to the promo length: loops back to the best-matching bar, crossfades, fades with the picture |
 | `audio/make_audio.py` | original synthesised score and interaction sounds, written on the same cue frames |
 | `public/` | Sora fonts, AartiMusic icon, cover art, `audio/score.wav` |
