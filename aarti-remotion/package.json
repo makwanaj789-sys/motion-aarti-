@@ -1,0 +1,21 @@
+{
+  "name": "aarti-remotion",
+  "private": true,
+  "version": "1.0.0",
+  "description": "AartiMusic 16:9 promo, choreographed to the measured reference timeline. Deterministic Remotion render.",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "audio": "python3 audio/make_audio.py public/audio/score.wav",
+    "render": "remotion render src/index.ts AartiPromo out/AartiMusic_Promo_Reference_16x9_1920x1080_60fps.mp4 --codec=h264 --crf=14 --pixel-format=yuv420p --audio-codec=aac --audio-bitrate=256k --concurrency=4",
+    "still": "remotion still src/index.ts AartiPromo"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.534",
+    "@remotion/renderer": "^4.0.534",
+    "@types/react": "^18.3.31",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.534",
+    "typescript": "^7.0.2"
+  }
+}
