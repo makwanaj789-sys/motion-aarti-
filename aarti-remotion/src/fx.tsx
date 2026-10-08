@@ -82,7 +82,7 @@ export const Trail: React.FC<{ pts: [number, number][]; width: number; alpha?: n
 export const TrailDefs: React.FC = () => (
   <defs>
     <filter id="trailGlow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="wide" />
+      <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="wide" />
       <feColorMatrix in="wide" type="matrix" values="0 0 0 0 0.47  0 0 0 0 0.80  0 0 0 0 0.86  0 0 0 0.9 0" result="tint" />
       <feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="core" />
       <feMerge><feMergeNode in="tint" /><feMergeNode in="core" /></feMerge>

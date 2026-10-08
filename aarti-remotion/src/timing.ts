@@ -66,10 +66,10 @@ export function spline(r: number, keys: [number, number][]): number {
 // The virtual shutter stays open for half a reference frame (one 60 fps frame),
 // so blur length = speed × 0.5; a box of length L is matched by sigma ≈ L / 2.4.
 export const SHUTTER = 0.5;
-export function blurOf(pos: (r: number) => [number, number], r: number, max = 70): [number, number] {
+export function blurOf(pos: (r: number) => [number, number], r: number, max = 70, shutter = SHUTTER): [number, number] {
   const d = 0.25;
   const [x0, y0] = pos(r - d), [x1, y1] = pos(r + d);
   const vx = (x1 - x0) / (2 * d), vy = (y1 - y0) / (2 * d);
-  const s = (v: number) => Math.min(max, (Math.abs(v) * SHUTTER) / 2.4);
+  const s = (v: number) => Math.min(max, (Math.abs(v) * shutter) / 2.4);
   return [s(vx), s(vy)];
 }

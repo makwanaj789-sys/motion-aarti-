@@ -29,8 +29,10 @@ const letterX = (r: number, base: number, i: number, n: number, start: number) =
   return base + spread + entry;
 };
 
-const Lockup: React.FC<{ r: number; shift: number; icon: number; size: number; weight: number; y: number; iconScale: number; iconGlow: number; id: string }> = ({ r, shift, icon, size, weight, y, iconScale, iconGlow, id }) => {
-  const L = lockupLayout(icon, icon * 0.3, size, weight);
+// `icon` is the solo icon size; as it slides aside it shrinks by `iconEnd` (reference: ×0.6)
+const Lockup: React.FC<{ r: number; shift: number; icon: number; iconEnd: number; size: number; weight: number; y: number; iconScale: number; iconGlow: number; id: string }> = ({ r, shift, icon, iconEnd, size, weight, y, iconScale, iconGlow, id }) => {
+  const fin = icon * iconEnd;
+  const L = lockupLayout(fin, fin * 0.3, size, weight);
   const p = E.lockup(r - shift);
   const ix = (rr: number): [number, number] => [lerp(CX, L.iconX, E.lockup(rr - shift)), 0];
   const [ibx] = blurOf(ix, r);
@@ -38,7 +40,7 @@ const Lockup: React.FC<{ r: number; shift: number; icon: number; size: number; w
   return (
     <>
       <MotionBlur id={`${id}-icon`} sx={ibx} sy={0}>
-        <div style={{ ...ABS, left: lerp(CX, L.iconX, p) - icon / 2, top: y - icon / 2, transform: `scale(${iconScale})`,
+        <div style={{ ...ABS, left: lerp(CX, L.iconX, p) - icon / 2, top: y - icon / 2, transform: `scale(${iconScale * lerp(1, iconEnd, p)})`,
           filter: `drop-shadow(0 0 ${18 + 26 * iconGlow}px ${C.glow(0.22 + 0.5 * iconGlow)})` }}>
           <AppIcon size={icon} />
         </div>
@@ -68,11 +70,12 @@ const Open: React.FC<{ r: number }> = ({ r }) => {
   const streakA = 1 - seg(r, 5.0, 6.0);
 
   const spark = bump(r, 5.4, 8, 11);
-  const sparkR = lerp(6, 46, seg(r, 5.5, 10.5));
+  const sparkR = lerp(8, 70, seg(r, 5.5, 10.5));
   const iconScale = r < 12.5 ? lerp(0.3, 1.22, eOutCubic(seg(r, 8.8, 12.5)))
     : r < 13.8 ? lerp(1.22, 1.3, eInOutSine(seg(r, 12.5, 13.8))) : lerp(1.3, 1, eInOutSine(seg(r, 13.8, 16.5)));
-  const ringR = lerp(36, 92, eOutCubic(seg(r, 9.5, 13.8)));
-  const ringA = 0.34 * bump(r, 9.5, 12.5, 16.5);
+  // a wide, dim halo ring (measured radius ≈210 → 285 px)
+  const ringR = lerp(150, 290, eOutCubic(seg(r, 9.5, 12.8)));
+  const ringA = 0.2 * bump(r, 9.5, 12, 16.5);
 
   // exit: the lockup sinks and fades (r47–53.5)
   const dropAt = (rr: number) => 150 * eInCubic(seg(rr, 47, 53.5));
@@ -83,16 +86,16 @@ const Open: React.FC<{ r: number }> = ({ r }) => {
     <AbsoluteFill>
       <svg width={W} height={H} style={ABS}>
         <TrailDefs />
-        {r >= 1 && r < 6 && <Trail pts={sample(curve, uT, Math.max(uT + 0.001, uH), 40)} width={7} head={24} alpha={streakA} />}
+        {r >= 1 && r < 6 && <Trail pts={sample(curve, uT, Math.max(uT + 0.001, uH), 40)} width={16} head={34} alpha={streakA} />}
         {spark > 0 && <circle cx={CX} cy={CY} r={sparkR} fill="url(#headGrad)" opacity={spark} />}
       </svg>
       {ringA > 0.003 && (
         <div style={{ ...ABS, left: CX - ringR - 40, top: CY - ringR - 40, width: 2 * ringR + 80, height: 2 * ringR + 80, borderRadius: '50%',
-          background: `radial-gradient(circle, transparent ${ringR - 14}px, ${C.glow(ringA)} ${ringR}px, transparent ${ringR + 16}px)` }} />
+          background: `radial-gradient(circle, transparent ${ringR - 46}px, ${C.glow(ringA)} ${ringR}px, transparent ${ringR + 40}px)` }} />
       )}
       {r >= 8.8 && r < 54 && (
         <MotionBlur id="openDrop" sx={0} sy={dropBlur} style={{ opacity: exitOp, transform: `translateY(${dropAt(r)}px) scale(${1 - 0.04 * seg(r, 47, 53.5)})`, transformOrigin: `${CX}px ${CY}px` }}>
-          <Lockup r={r} shift={0} icon={64} size={58} weight={400} y={CY} iconScale={iconScale} iconGlow={bump(r, 9, 12.5, 19)} id="open" />
+          <Lockup r={r} shift={0} icon={120} iconEnd={0.62} size={70} weight={400} y={CY} iconScale={iconScale} iconGlow={bump(r, 9, 12.5, 19)} id="open" />
         </MotionBlur>
       )}
     </AbsoluteFill>
@@ -100,11 +103,11 @@ const Open: React.FC<{ r: number }> = ({ r }) => {
 };
 
 // ================================================================== greeting geometry (world space = screen space in the wide shot)
-const GREET = { words: ['Good', 'evening,', 'Ajay'], size: 64, icon: 54 };
+const GREET = { words: ['Good', 'evening,', 'Ajay'], size: 84, icon: 70 };
 const greetLayout = (r: number) => {
   const up = E.greetUp(r);
   const y = r < 80 ? CY - 9 * eInOutSine(seg(r, 70, 80)) : lerp(CY - 9, 393, up);
-  const sc = r < 80 ? 1 - 0.05 * eInOutSine(seg(r, 70, 80)) : lerp(0.95, 0.8, up);
+  const sc = r < 80 ? 1 - 0.05 * eInOutSine(seg(r, 70, 80)) : lerp(0.95, 0.66, up);
   const extra = spline(r, [[61, 150], [63, 95], [65.5, 12], [67, -12], [70, -10], [74, -2], [77, 0]]);
   const size = GREET.size * sc, icon = GREET.icon * sc, gap = 18 * sc;
   const space = textW(' ', size) + extra * sc;
@@ -121,10 +124,10 @@ const landing = () => { const g = greetLayout(78); return [[g.iconX + g.icon / 2
 const Arcs: React.FC<{ r: number }> = ({ r }) => {
   const L = landing();
   const paths: { p: number[][]; a: number; b: number; w: number }[] = [
-    { p: [[930, 690], [420, 1130], [130, 520], L[0]], a: 53, b: 62, w: 7 },
-    { p: [[990, 700], [1560, 1150], [1720, 260], L[3]], a: 53.5, b: 62.5, w: 7 },
-    { p: [[960, 660], [1180, -60], [760, 60], L[2]], a: 54, b: 62, w: 6 },
-    { p: [[920, 700], [640, 330], [460, 140], L[1]], a: 55, b: 61.5, w: 5 },
+    { p: [[930, 690], [420, 1130], [130, 520], L[0]], a: 53, b: 62, w: 10 },
+    { p: [[990, 700], [1560, 1150], [1720, 260], L[3]], a: 53.5, b: 62.5, w: 10 },
+    { p: [[960, 660], [1180, -60], [760, 60], L[2]], a: 54, b: 62, w: 9 },
+    { p: [[920, 700], [640, 330], [460, 140], L[1]], a: 55, b: 61.5, w: 7 },
   ];
   return (
     <svg width={W} height={H} style={ABS}>
@@ -167,7 +170,7 @@ const GreetingField: React.FC<{ r: number }> = ({ r }) => {
   const cam = camera(r);
   // blur follows the screen motion of the part of the field the eye is on
   const focusX = r < 128 ? 620 : 1150;
-  const [bx, by] = blurOf((rr) => toScreen(rr, focusX, 575), r, 60);
+  const [bx, by] = blurOf((rr) => toScreen(rr, focusX, 575), r, 90, 1.0);
   const g = greetLayout(r);
   const out = 1 - seg(r, 159, 170);
   const greetGlow = 0.12 + 0.55 * bump(r, 62, 66.5, 72);
@@ -176,8 +179,10 @@ const GreetingField: React.FC<{ r: number }> = ({ r }) => {
   const bloomA = spline(r, [[80.5, 0], [81.5, 0.35], [83, 0.85], [84.2, 1], [85.5, 0.85], [87, 0.45], [88.5, 0.1], [89.5, 0]]);
   const rx = spline(r, [[80.5, 60], [82, 260], [84, 520], [85.5, 610], [87, 700], [88.5, 640]]);
   const ry = spline(r, [[80.5, 26], [82, 80], [84, 128], [86, 120], [87.5, 112]]);
+  const bloomY = spline(r, [[80.5, 690], [84, 684], [86, 640], [88, 592], [89.5, FIELD.y + FIELD.h / 2]]);
   const fieldIn = eOutCubic(seg(r, 85.5, 89.5));
   const fieldOp = eOutCubic(seg(r, 85.5, 88.5));
+  const bloomY0 = 640 - (FIELD.y + FIELD.h / 2); // the box condenses where the bloom is at r86
   const focused = seg(r, 108, 110);
   const n = typedAt(r);
   const typed = QUERY.slice(0, n);
@@ -203,8 +208,8 @@ const GreetingField: React.FC<{ r: number }> = ({ r }) => {
         {/* bloom */}
         {bloomA > 0.003 && (
           <svg width={W} height={H} style={{ ...ABS, overflow: 'visible' }}>
-            <defs><filter id="bloomBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="16" /></filter></defs>
-            <ellipse cx={CX} cy={FIELD.y + FIELD.h / 2} rx={rx} ry={ry} fill="none" stroke={C.hot} strokeOpacity={bloomA * 0.6} strokeWidth={ry * 0.55} filter="url(#bloomBlur)" />
+            <defs><filter id="bloomBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="22" /></filter></defs>
+            <ellipse cx={CX} cy={bloomY} rx={rx} ry={ry} fill="none" stroke={C.hot} strokeOpacity={bloomA * 0.6} strokeWidth={ry * 0.8} filter="url(#bloomBlur)" />
           </svg>
         )}
         {/* soft light pooled under the field */}
@@ -215,7 +220,7 @@ const GreetingField: React.FC<{ r: number }> = ({ r }) => {
         {/* the field */}
         {r >= 85.5 && (
           <div style={{ ...ABS, left: FIELD.x, top: FIELD.y, width: FIELD.w, height: FIELD.h, borderRadius: FIELD.rad, opacity: fieldOp,
-            transform: `scale(${lerp(1.25, 1, fieldIn)}, ${lerp(0.8, 1, fieldIn)})`,
+            transform: `translateY(${(lerp(bloomY0, 0, fieldIn)).toFixed(2)}px) scale(${lerp(1.25, 1, fieldIn)}, ${lerp(0.8, 1, fieldIn)})`,
             filter: fieldIn < 0.995 ? `brightness(${lerp(2.6, 1, fieldIn).toFixed(3)}) blur(${(12 * (1 - fieldIn)).toFixed(2)}px)` : undefined,
             background: `linear-gradient(180deg, ${C.field2}, #0b1c23)`,
             boxShadow: `inset 0 0 0 3px ${focused > 0 ? `rgba(119,204,219,${(0.35 + 0.6 * focused).toFixed(3)})` : C.line}, 0 24px 60px rgba(0,0,0,.55)` }}>
@@ -242,10 +247,10 @@ const Press: React.FC<{ r: number }> = ({ r }) => {
   const press = 1 - 0.06 * bump(r, 188.5, 190, 192);
   const pale = bump(r, 198.5, 200.5, 204.5);
 
-  const HS = 150, tip = [HS * 0.383, HS * 0.1];
+  const HS = 190, tip = [HS * 0.383, HS * 0.1];
   const handAt = (rr: number): [number, number] => {
-    const k = 1 - eOutQuad(seg(rr, 173, 190));
-    return [CX + 30 - tip[0] + 95 * k, CY + 36 - tip[1] + 520 * k + 560 * eInCubic(seg(rr, 203.5, 210))];
+    const k = 1 - eOutCubic(seg(rr, 172.5, 188));
+    return [CX + 30 - tip[0] + 70 * k, CY + 40 - tip[1] + 400 * k + 600 * eInCubic(seg(rr, 203.5, 210))];
   };
   const [hbx, hby] = blurOf(handAt, r);
   const [hx, hy] = handAt(r);
@@ -265,7 +270,7 @@ const Press: React.FC<{ r: number }> = ({ r }) => {
       <MotionBlur id="btnBlur" sx={0} sy={bBlur}>
         <div style={{ ...ABS, left: CX - B / 2, top: by(r) - B / 2, width: B, height: B, borderRadius: 46, opacity: op,
           transform: `scale(${press})`,
-          filter: `brightness(${lerp(0.45, 1, seg(r, 170, 178)).toFixed(3)})`,
+          filter: `brightness(${(lerp(0.45, 1, seg(r, 170, 178)) * lerp(1, 0.45, seg(r, 203, 208))).toFixed(3)})`,
           background: `linear-gradient(160deg, #8fd9e6, ${C.flame} 45%, #4fa9bb)`,
           boxShadow: `0 0 ${30 + 30 * pale}px ${C.glow(0.28 + 0.3 * pale)}, inset 0 1px 0 rgba(255,255,255,.35)` }}>
           <div style={{ position: 'absolute', inset: 0, borderRadius: 46, background: `rgba(240,252,255,${(0.5 * pale).toFixed(3)})` }} />
@@ -285,9 +290,9 @@ const Press: React.FC<{ r: number }> = ({ r }) => {
 
 // ================================================================== 5 · results stream in, camera eases out (r212–282)
 const resultsView = (r: number) => {
-  const z = spline(r, [[212, 1], [224, 1], [240, 0.9], [262, 0.635], [272, 0.6]]);
-  const L = spline(r, [[212, 100], [224, 100], [240, 125], [262, 503], [272, 528]]);
-  const T = r < 222.5 ? lerp(-60, 282, eOutCubic(seg(r, 212.5, 222.5))) : spline(r, [[222.5, 282], [226, 283], [240, 215], [262, 105], [272, 100]]);
+  const z = spline(r, [[212, 1.25], [224, 1.25], [240, 1.1], [262, 0.64], [272, 0.6]]);
+  const L = spline(r, [[212, 100], [224, 100], [240, 112], [262, 500], [272, 528]]);
+  const T = r < 222.5 ? lerp(-70, 282, eOutCubic(seg(r, 212.5, 222.5))) : spline(r, [[222.5, 282], [228, 268], [236, 170], [242, 112], [252, 98], [262, 140], [272, 179]]);
   return { z, L, T };
 };
 const heatOf = (r: number, t: number) => (r < t ? 0 : Math.exp(-(r - t) / 4.5));
@@ -318,15 +323,15 @@ const ItemView: React.FC<{ it: Item; r: number }> = ({ it, r }) => {
   const t = it.t, h = heatOf(r, t + 0.6);
   const wipe = (a: number, b: number) => `inset(-30px ${(100 * (1 - eOutCubic(seg(r, a, b)))).toFixed(2)}% -30px -10px)`;
   return (
-    <div style={{ ...ABS, top: it.y, width: 1440, height: 108 }}>
-      <div style={{ ...ABS, width: 92, height: 92, borderRadius: 18, overflow: 'hidden', opacity: eOutCubic(seg(r, t, t + 2.2)),
+    <div style={{ ...ABS, top: it.y, width: 1440, height: 92 }}>
+      <div style={{ ...ABS, width: 80, height: 80, borderRadius: 16, overflow: 'hidden', opacity: eOutCubic(seg(r, t, t + 2.2)),
         transform: `scale(${lerp(0.88, 1, eOutCubic(seg(r, t, t + 3)))})`, boxShadow: `0 0 ${28 * h}px ${C.glow(0.55 * h)}` }}>
-        <Img src={staticFile(`covers/${it.cover}.jpg`)} style={{ width: 92, height: 92, display: 'block' }} />
+        <Img src={staticFile(`covers/${it.cover}.jpg`)} style={{ width: 80, height: 80, display: 'block' }} />
       </div>
-      <div style={txt(38, 400, C.ink, { left: 124, top: 12, clipPath: wipe(t + 0.3, t + 3.2), textShadow: glow(0.7 * h, 18) })}>{it.title}</div>
-      <div style={txt(29, 400, C.mist, { left: 124, top: 60, clipPath: wipe(t + 1, t + 3.8), textShadow: glow(0.45 * h, 14) })}>{it.sub}</div>
-      {it.dur && <div style={txt(29, 400, C.mist, { left: 1236, top: 34, opacity: eOutCubic(seg(r, t + 2.5, t + 4.5)) })}>{it.dur}</div>}
-      <div style={{ ...ABS, left: 1352, top: 26, opacity: eOutCubic(seg(r, t + 2.8, t + 4.8)) }}><Heart size={44} color={C.mist} /></div>
+      <div style={txt(36, 400, C.ink, { left: 110, top: 6, clipPath: wipe(t + 0.3, t + 3.2), textShadow: glow(0.7 * h, 18) })}>{it.title}</div>
+      <div style={txt(27, 400, C.mist, { left: 110, top: 50, clipPath: wipe(t + 1, t + 3.8), textShadow: glow(0.45 * h, 14) })}>{it.sub}</div>
+      {it.dur && <div style={txt(27, 400, C.mist, { left: 1236, top: 27, opacity: eOutCubic(seg(r, t + 2.5, t + 4.5)) })}>{it.dur}</div>}
+      <div style={{ ...ABS, left: 1352, top: 20, opacity: eOutCubic(seg(r, t + 2.8, t + 4.8)) }}><Heart size={40} color={C.mist} /></div>
     </div>
   );
 };
@@ -366,13 +371,13 @@ const Waveform: React.FC<{ r: number }> = ({ r }) => {
       <g filter="url(#waveGlow)">
         {rows.map((it, i) => {
           const len = it.kind === 'row' ? 1300 : textW(it.text, it.kind === 'header' ? 46 : 34, 600);
-          const midY = it.y + (it.kind === 'row' ? 46 : 18);
+          const midY = it.y + (it.kind === 'row' ? 40 : 18);
           const map = (wx: number, wy: number): [number, number] => {
             const sx = v.L + wx * v.z, sy = v.T + wy * v.z;
             return [SQ_CENTER[0] + (sx - SQ_CENTER[0]) * scale, SQ_CENTER[1] + (sy - SQ_CENTER[1]) * scale];
           };
-          const [x0, y0] = map(it.kind === 'row' ? 124 : 0, midY);
-          const [x1] = map((it.kind === 'row' ? 124 : 0) + len * (it.kind === 'row' ? 0.7 : 1), midY);
+          const [x0, y0] = map(it.kind === 'row' ? 110 : 0, midY);
+          const [x1] = map((it.kind === 'row' ? 110 : 0) + len * (it.kind === 'row' ? 0.7 : 1), midY);
           const X0 = lerp(x0, CX - 190, merge), X1 = lerp(x1, CX + 190, merge), Y = lerp(y0, CY, merge);
           const pts: string[] = [];
           for (let k = 0; k <= 64; k++) {
@@ -393,10 +398,10 @@ const LINE1 = 'Your daily';
 const L1_KEYS = [281, 283, 284.5, 286, 287.5, 289, 290.5, 292, 293, 295];
 const Outro: React.FC<{ r: number }> = ({ r }) => {
   const S1 = 108, w1 = textW(LINE1, S1, 600), left1 = CX - w1 / 2;
-  const word1 = 1 - seg(r, 300, 301.5);
+  const word1 = r < 300.5 ? 1 : 0;
   const scale1 = lerp(1.08, 1, eOutCubic(seg(r, 281, 300)));
   const S2 = 66, w2 = textW('sound.', S2, 600);
-  const snd = seg(r, 300.5, 301.5) * (1 - seg(r, 315, 319));
+  const snd = (r >= 300.5 ? 1 : 0) * (1 - seg(r, 315, 319));
   const sndScale = lerp(1.1, 1, eOutCubic(seg(r, 301, 313))) * lerp(1, 0.9, seg(r, 315, 319));
   const sndGlow = lerp(0.8, 0.18, eOutCubic(seg(r, 301, 311)));
   const iconScale = r < 319 ? lerp(0.55, 1, eOutCubic(seg(r, 316, 319)))
@@ -405,7 +410,7 @@ const Outro: React.FC<{ r: number }> = ({ r }) => {
   const handle = eOutCubic(seg(r, 336, 344));
   return (
     <AbsoluteFill>
-      {r < 301.5 && (
+      {r < 300.5 && (
         <div style={{ ...ABS, width: W, height: H, opacity: word1, transformOrigin: `${CX}px ${CY}px`, transform: `scale(${scale1})` }}>
           {[...LINE1].map((ch, i) => {
             const t = L1_KEYS[i];
@@ -423,7 +428,7 @@ const Outro: React.FC<{ r: number }> = ({ r }) => {
           textShadow: glow(sndGlow, 30), filter: r > 315 ? `blur(${(6 * seg(r, 315, 319)).toFixed(2)}px)` : undefined })}>sound.</div>
       )}
       {r >= 316 && (
-        <Lockup r={r} shift={301} icon={120} size={92} weight={600} y={lockY} iconScale={iconScale}
+        <Lockup r={r} shift={301} icon={120} iconEnd={0.78} size={86} weight={600} y={lockY} iconScale={iconScale}
           iconGlow={0.35 * seg(r, 316, 319) + 0.5 * bump(r, 318, 321.5, 327)} id="end" />
       )}
       {handle > 0.003 && (

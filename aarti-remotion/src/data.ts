@@ -33,7 +33,7 @@ let y = 0;
 for (const it of list) {
   if (it.kind === 'header') { it.y = y; y += 96; }
   else if (it.kind === 'section') { if (y > 96) y += 36; it.y = y; y += 54; }
-  else if (it.kind === 'row') { it.y = y; y += 120; }
+  else if (it.kind === 'row') { it.y = y; y += 100; }
   else { y += 34; it.y = y; y += 40; }
 }
 export const RESULTS = list;
