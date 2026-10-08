@@ -12,7 +12,7 @@ from scipy import signal
 from scipy.io import wavfile
 
 SR = 48000
-REF_END = 366
+REF_END = 372
 DUR = REF_END / 30
 N = int(DUR * SR) + SR // 2
 rng = np.random.default_rng(7)
@@ -249,7 +249,7 @@ mix = room(mus, 2.2, 0.28) + room(sfx, 0.9, 0.12)
 mix[:, 0] = hp(mix[:, 0], 28)
 mix[:, 1] = hp(mix[:, 1], 28)
 mix = mix[: int(DUR * SR)]
-fade = int(T(366 - 356) * SR)                    # follows the picture's fade to black
+fade = int(T(10) * SR)                    # follows the picture's fade to black
 mix[-fade:] *= (np.cos(np.linspace(0, np.pi, fade)) * 0.5 + 0.5)[:, None]
 mix[: int(0.01 * SR)] *= np.linspace(0, 1, int(0.01 * SR))[:, None]
 

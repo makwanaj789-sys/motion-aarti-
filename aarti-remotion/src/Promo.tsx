@@ -170,7 +170,9 @@ const GreetingField: React.FC<{ r: number }> = ({ r }) => {
   const cam = camera(r);
   // blur follows the screen motion of the part of the field the eye is on
   const focusX = r < 128 ? 620 : 1150;
-  const [bx, by] = blurOf((rr) => toScreen(rr, focusX, 575), r, 90, 1.0);
+  // horizontal whips get the reference's long smear; the vertical lift keeps a normal shutter
+  const [bx] = blurOf((rr) => toScreen(rr, focusX, 575), r, 90, 1.0);
+  const [, by] = blurOf((rr) => toScreen(rr, focusX, 575), r, 40);
   const g = greetLayout(r);
   const out = 1 - seg(r, 159, 170);
   const greetGlow = 0.12 + 0.55 * bump(r, 62, 66.5, 72);
@@ -443,7 +445,7 @@ const Outro: React.FC<{ r: number }> = ({ r }) => {
 export const Promo: React.FC = () => {
   const frame = useCurrentFrame();
   const r = frame / 2;
-  const fadeOut = 1 - eInOutSine(seg(r, 356, 366));
+  const fadeOut = 1 - eInOutSine(seg(r, 362, 372));
   return (
     <AbsoluteFill style={{ background: C.bg, overflow: 'hidden' }}>
       <Audio src={staticFile('audio/score.wav')} />

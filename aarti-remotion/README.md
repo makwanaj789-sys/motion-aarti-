@@ -1,6 +1,6 @@
 # AartiMusic promo (Remotion source)
 
-16:9 promotional video, 1920×1080 at 60 fps, 12.2 s. Its choreography is
+16:9 promotional video, 1920×1080 at 60 fps, 12.4 s. Its choreography is
 re-timed frame by frame to the supplied Claude reference cut. The measurements
 are in [`docs/REFERENCE_NOTES.md`](docs/REFERENCE_NOTES.md).
 

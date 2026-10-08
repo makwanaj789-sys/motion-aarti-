@@ -6,7 +6,7 @@ import { Easing } from 'remotion';
 
 export const FPS = 60;
 export const REF_FPS = 30;
-export const REF_END = 366; // reference runs 336; +30 frames to give the end card reading time
+export const REF_END = 372; // reference runs 336; +36 frames so the end card and handle get a full second to read
 export const TOTAL_FRAMES = REF_END * (FPS / REF_FPS);
 export const W = 1920;
 export const H = 1080;

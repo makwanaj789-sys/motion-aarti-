@@ -32,10 +32,10 @@ at 60 fps, so composition frame = 2·r. Pixel values are converted to 1920×1080
 | 278–300 | Symbol, then the big word types in, glow decays, slight scale-down | letters at r281/289/290/295 | “Your daily”, 10 keys r281–295 |
 | 301–315 | Smaller word, bright then cooling | scale 1.1 → 1 | “sound.” |
 | 316–324 | Word dissolves into the logo, which pops ×1.3 and settles | pop peak r321–322 | AartiMusic icon |
-| 324–336 | Logo hold (reference ends here) | 0.4 s | extended: wordmark lockup (same motion as r24–43), “@AartiMusic_bot”, 0.5 s read, fade |
+| 324–336 | Logo hold (reference ends here) | 0.4 s | extended: wordmark lockup (same motion as r24–43), “@AartiMusic_bot”, ~0.9 s read, fade r362–372 |
 
 The reference ends after a 0.4 s logo hold. The brief adds a wordmark and a
-secondary line, so the end card runs 30 reference frames (1 s) longer: 12.2 s total.
+secondary line, so the end card runs 36 reference frames (1.2 s) longer: 12.4 s total.
 
 ## Motion blur
 
