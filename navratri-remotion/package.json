@@ -1,0 +1,24 @@
+{
+  "name": "navratri-remotion",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Gujarati Navratri music edit, 1920x573 @ 60 fps, frame-locked to the song.",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "cutouts": "python3 scripts/make_cutouts.py",
+    "render": "remotion render src/index.ts Navratri out/Navratri_Garba_1920x574_60fps.mp4 --codec=h264 --crf=14 --pixel-format=yuv420p --audio-codec=aac --audio-bitrate=320k --concurrency=4"
+  },
+  "dependencies": {
+    "@fontsource/anton": "^5.3.0",
+    "@fontsource/noto-serif-gujarati": "^5.3.0",
+    "@fontsource/playfair-display": "^5.3.0",
+    "@remotion/bundler": "^4.0.534",
+    "@remotion/cli": "^4.0.534",
+    "@remotion/renderer": "^4.0.534",
+    "@types/react": "^18.3.31",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.534",
+    "typescript": "^7.0.2"
+  }
+}
