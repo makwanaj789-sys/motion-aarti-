@@ -1,5 +1,18 @@
 # Navratri: "शुभारंभ" edit (Remotion source)
 
+**Main composition: `NavratriPhoto`**. It is built from the four supplied transparent PNGs
+(`assets_src/` → `npm run prep` → `public/photos/`):
+- garba dancer
+- dandiya pair
+- Maa Amba
+- floral corner
+
+Output: `../output/Navratri_Shubhaarambh_PNG_1920x572_60fps.mp4`.
+Fonts: Teko (bold display) + Tiro Devanagari Hindi (serif) for the Hindi, and Playfair Display italic for `@h81t6`.
+
+The older all-vector version below is kept as the `NavratriHindi` composition.
+
+
 A 1920×572 edit (3.35:1, the reference reel's canvas) at 60 fps, 15.63 s long,
 timed to the song segment from the wide reference reel.
 

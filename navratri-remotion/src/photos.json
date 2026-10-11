@@ -1,1 +1,22 @@
-{}
+{
+ "amba": {
+  "file": "photos/amba.png",
+  "w": 987,
+  "h": 1507
+ },
+ "dancer": {
+  "file": "photos/dancer.png",
+  "w": 999,
+  "h": 1500
+ },
+ "dandiyaPair": {
+  "file": "photos/dandiyaPair.png",
+  "w": 1000,
+  "h": 1326
+ },
+ "flowers": {
+  "file": "photos/flowers.png",
+  "w": 1293,
+  "h": 1187
+ }
+}

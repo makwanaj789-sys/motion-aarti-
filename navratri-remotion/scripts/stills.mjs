@@ -10,7 +10,7 @@ fs.mkdirSync(out, { recursive: true });
 const serveUrl = await bundle({ entryPoint: path.resolve('src/index.ts') });
 const browserExecutable = process.env.REMOTION_BROWSER || null;
 const browser = await openBrowser('chrome', { browserExecutable, chromiumOptions: { gl: 'swangle' } });
-const composition = await selectComposition({ serveUrl, id: 'NavratriHindi', puppeteerInstance: browser });
+const composition = await selectComposition({ serveUrl, id: process.env.COMP || 'NavratriPhoto', puppeteerInstance: browser });
 for (const f of frames.map(Number)) {
   await renderStill({ composition, serveUrl, frame: f, output: path.join(out, `f${String(f).padStart(4, '0')}.png`), puppeteerInstance: browser, scale: Number(process.env.SCALE || 1) });
   process.stdout.write(`${f} `);
