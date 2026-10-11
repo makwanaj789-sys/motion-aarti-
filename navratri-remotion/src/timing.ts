@@ -5,8 +5,8 @@ import { Easing } from 'remotion';
 
 export const FPS = 60;
 export const W = 1920;
-// 1920×573 is the reference ratio (3.35:1); H.264 4:2:0 needs even dimensions, so the canvas is 574 px tall.
-export const H = 574;
+// 1920×572: the reference reel's 3.35:1 canvas (even height for H.264 4:2:0).
+export const H = 572;
 export const SONG_END = 15.628;
 export const TOTAL_FRAMES = Math.round(SONG_END * FPS);
 

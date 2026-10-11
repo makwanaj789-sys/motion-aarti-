@@ -6,7 +6,7 @@
   "scripts": {
     "studio": "remotion studio src/index.ts",
     "cutouts": "python3 scripts/make_cutouts.py",
-    "render": "remotion render src/index.ts Navratri out/Navratri_Garba_1920x574_60fps.mp4 --codec=h264 --crf=14 --pixel-format=yuv420p --audio-codec=aac --audio-bitrate=320k --concurrency=4"
+    "render": "remotion render src/index.ts NavratriHindi out/Navratri_Shubhaarambh_1920x572_60fps.mp4 --codec=h264 --crf=14 --pixel-format=yuv420p --audio-codec=aac --audio-bitrate=320k --concurrency=4"
   },
   "dependencies": {
     "@fontsource/anton": "^5.3.0",
