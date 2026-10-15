@@ -105,6 +105,8 @@ out['research'] = {'kind': 'measured', 'letters': 'research', 'final_x': [r4(457
 el = [o for o in tracks['logo'] if 352 <= o['f'] <= 389]
 sz = [(o['x1'] - o['x0']) for o in el]
 core = [300, 262, 236, 222, 213] + sz[5:]  # first five include the bloom; core sizes estimated
+# the tracker rounds to whole pixels, which leaves 1-frame plateaus; a light 3-tap smooth keeps the decay strictly monotone
+core = core[:6] + [float(np.mean(core[i - 1:i + 2])) for i in range(6, len(core) - 1)] + core[-1:]
 out['end_logo'] = {'kind': 'measured from 11.9 s; 11.733-11.867 core size estimated (bloom)', 't': [t_of(o['f']) for o in el] + [13.0],
                    'size_w': [r4(v / W) for v in core] + [0.0], 'glow': [11.717, 11.95]}
 

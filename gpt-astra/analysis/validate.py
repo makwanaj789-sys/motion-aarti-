@@ -80,7 +80,7 @@ rl = [o for o in tr['logo'] if 30 <= o['f'] <= 60]
 rp = [(o['f'] / 30, (o['cx'] - 643) / (338 - 643)) for o in rl]
 op = []
 for t, _ in rp:
-    b = bright_box(O(round(t * 60)), 0, 560 if t > 1.28 else 1280)
+    b = bright_box(O(round(t * 60)), 0, 440 if t > 1.28 else 1280)  # left of the first letter
     op.append(b[2] if b else np.nan)
 op = np.array(op); op = (op - op[0]) / (op[-1] - op[0])
 rep['logo_slide_progress_max_err'] = round(float(np.nanmax(np.abs(op - np.array([p for _, p in rp])))), 3)
@@ -108,7 +108,7 @@ rep['coding_left_edge_max_err_w'] = round(float(np.nanmax([abs(a - b) for _, a, 
 def pcm(f):
     return np.frombuffer(subprocess.run(['ffmpeg', '-v', 'error', '-i', f, '-t', '13.9', '-ac', '1', '-ar', '16000', '-f', 'f32le', '-'], capture_output=True, check=True).stdout, np.float32)
 a, b = pcm(out_mp4), pcm(ref_mp4); n = min(len(a), len(b))
-xc = np.correlate(a[16000:48000], b[16000:48000 + 160], 'valid'); lag = int(np.argmax(xc))
+lags = range(-80, 81); lag = max(lags, key=lambda L: float(np.dot(a[16000 + L:48000 + L], b[16000:48000])))
 rep['audio'] = {'corr': round(float(np.corrcoef(a[:n], b[:n])[0, 1]), 5), 'lag_samples_16k': lag}
 
 json.dump(dict(report=rep, ui=ui, code=code, end_logo=ew, writing=wr, coding=co), open(f'{wd}/validation.json', 'w'), indent=1)

@@ -469,7 +469,7 @@ const Words: React.FC<{ t: number }> = ({ t }) => {
       <AbsoluteFill>
         <div style={{ position: 'absolute', left: 0, top: 0, width: W, height: H, transformOrigin: `${x0}px ${lineCY}px`, transform: `scale(${s})` }}>
           <Glyphs text="Writing" size={SW} x={x0} baseY={base(SW)} per={(i) => {
-            const tau = t - [8.583, 8.59, 8.633, 8.667, 8.7, 8.733, 8.767][i];
+            const tau = t - [8.555, 8.565, 8.633, 8.667, 8.7, 8.733, 8.767][i];
             return { o: E.out(seg(tau, 0, 0.03)), blur: 4 * (1 - E.out(seg(tau, 0, 0.1))), glow: tau < 0 ? 0 : 1.3 * Math.exp(-tau / 0.12) };
           }} />
         </div>
@@ -519,7 +519,7 @@ const ResearchWord: React.FC<{ t: number }> = ({ t }) => {
 
 // ================================================================== 6 · logo flash → measured shrink → vanish (11.717 – 12.983)
 const EndLogo: React.FC<{ t: number }> = ({ t }) => {
-  const size = Math.max(0, mono(t, [11.717, ...END_LOGO.t], [0.25, ...END_LOGO.size]) * W);
+  const size = Math.max(0, mono(t, [11.717, ...END_LOGO.t], [0.25, ...END_LOGO.size]) * W * 1.035); // our mark's ink fills less of its box than the reference's
   const bloom = 1 - E.soft(seg(t, 11.717, 11.96));
   if (size < 1) return null;
   return (

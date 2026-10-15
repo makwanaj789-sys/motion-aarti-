@@ -1,79 +1,83 @@
 # GPT Astra 6: fan-made ChatGPT concept promo (Remotion source)
 
-**Main composition: `AstraRef`** (`src/AstraRef.tsx`)
-- 1920×1080, native 60 fps, 14.0 s, H.264 yuv420p with fast-start
-- Output: `../output/GPT_Astra_6_Concept_v2_RefAudio_1920x1080_60fps.mp4`
+**Main composition: `AstraV3`** (`src/AstraV3.tsx`)
+- 1920×1080, native 60 fps, 14.6 s, H.264 High, yuv420p, fast-start
+- Output: `../output/GPT_Astra_6_Concept_v3_1920x1080_60fps.mp4`
+- Earlier versions are kept as compositions: `AstraRef` (v2, `src/AstraRef.tsx`) and `AstraPromo` (v1, `src/Astra.tsx`).
 
 This is an unofficial fan concept.
-- "GPT Astra 6" is a concept entry. The video labels it "Fan-made concept" at the start, tags it CONCEPT in the model menu and ends on "Fan-made concept · not affiliated with OpenAI".
+- "GPT Astra 6" is a concept entry: the opening says "Fan-made concept" and the model menu tags the entry CONCEPT.
 - The ChatGPT/OpenAI mark is a trademark of OpenAI.
+- The video ends on the ChatGPT logo, "GPT Astra 6" and "Created by @h81t6".
 
-The first version (`AstraPromo`, `src/Astra.tsx`, 18.2 s, original synthesised score) is kept for reference.
+## What v3 changes: motion measured from the reference, not approximated
 
-## Audio
+The reference's 420 frames (74505.mp4, 1280×720, 30 fps) were decoded and measured frame by frame with the scripts in `analysis/`:
 
-The soundtrack is the reference video's own audio, used unchanged: same segment, speed and pitch. The animation is rebuilt on its accents instead of the music being fitted to the picture. Its licence is unknown, so the WAV is not committed.
+| Script | What it measures |
+|---|---|
+| `metrics.py` | Cuts; frame-to-frame scale and translation |
+| `cam_direct.py` | UI camera: every frame registered to one anchor frame. Roll was checked with Hough lines and is zero |
+| `cam.py` | Code camera |
+| `tracks.py` | Moon, logo, letter and word tracks; glyph runs; glow energy |
+| `light.py` | Background light |
+| `sheets.py` | Every-frame contact sheets |
+
+`analysis/build_timing.py` turns these into `timing/ref_timing_map.json` (normalized coordinates, each value marked *measured* or *estimate*) and `src/refData.ts`. A readable summary is in `timing/TIMING_MAP.md`.
+
+The composition is driven by those tracks:
+- camera paths, the lockup slide and exit, letter settle, word positions and scale curves, the end-logo size and the end-card motion;
+- evaluated at 60 fps with monotone cubic interpolation between the 30 fps samples. That gives real in-between states (no duplicated frames) and adds no overshoot that is not in the data.
+
+The reference's hard cuts stay hard cuts.
+
+Motion blur:
+- 16 sub-frame samples with a 90° shutter, only on the frames where the measured speed peaks.
+- Samples are clamped to the current shot, so nothing is blended across a cut. The previous version's ghosted headings came from exactly that.
+- Holds and reveals render as single sharp images.
+
+## Checking a render against the reference
 
 ```bash
-scripts/extract_audio.sh /path/to/reference.mp4   # → public/audio/reference.wav
+python3 analysis/validate.py <render.mp4> <reference.mp4> <workdir>
 ```
 
-Onsets were measured with spectral flux, and every cue in `T = {…}` sits on one of them:
-
-0.84 · 1.33 · 1.88 · 2.15 · 2.43 · 3.10 · 3.51 · 4.06 · 4.33 · 4.88 · 5.28 · 5.69 · 6.24 · 6.52 · 6.80 · 7.06 · 8.15 · 8.43 · 8.70 · 9.24 · 10.06 · 10.71 · 10.88 · 11.84
-
-The music decays after about 12.6 s and is silent after 13.0 s.
-
-## Sequence (matches the reference's timestamps)
-
-| Time (s) | Scene |
-|---|---|
-| 0 – 0.95 | Night sky: the moon glows, then hands over to the logo |
-| 0.84 – 2.39 | Logo, then "ChatGPT" (Fraunces) letter by letter, soft to sharp. Push in at 1.88, lift away at 2.15 |
-| 2.33 – 4.0 | Chat UI fills the frame, then a whip-in on the input. "Help me build a dashboard" types with the caret |
-| 4.04 – 6.75 | Whip pan to the model selector. Click ring, then the dropdown opens. The cursor moves GPT-6 → GPT-6 Pro → GPT-5.6 Sol → GPT-5.6 Luna → **GPT Astra 6 (Concept)**. The entry is selected, the menu closes and the selector reads "GPT Astra 6" |
-| 7.06 – 8.6 | Code response: the camera starts close on the first lines and eases back while lines arrive (the newest line glows), then pulls back at 8.3 |
-| 8.66 – 11.86 | "Writing" / "& analysis" (9.24), "Coding" (10.06), "Research" (10.66). Per-letter blur-to-sharp reveals |
-| 11.8 – 14.0 | Logo flash with bloom, shrinks and settles. "GPT Astra 6" and the fan-made footer |
+This runs the same trackers on the render and compares motion, not pixels: the UI and code camera curves, the logo slide, the word left edges, the end-logo size, repeated frames during motion, and audio identity. Curves are written to `<workdir>/validation.png`.
 
 ## Model names in the menu
 
-The names were checked against current OpenAI sources (October 2026):
+The names were checked against OpenAI's help-centre and release-note pages, through search results. The pages themselves were not reachable from the build environment.
 
 | Name | Source |
 |---|---|
 | GPT-6 (latest), GPT-6 Pro | https://help.openai.com/en/articles/20001354-gpt-6-and-other-models-in-chatgpt |
 | GPT-5.6 Sol | https://openai.com/index/improving-gpt-5-6-sol-in-chatgpt/ |
 | GPT-5.6 Luna (Free and Go default) | https://help.openai.com/en/articles/6825453-chatgpt-release-notes |
-| Model list, release notes | https://developers.openai.com/api/docs/models, https://help.openai.com/en/articles/9624314-model-release-notes |
 
-The thinking level (Instant / Medium / High / Extra High) is a *mode*, not a model. It appears as a separate "Thinking · Medium" row.
+"Thinking · Medium" is a mode, so it sits on its own row.
 
-## How it is built
+## Audio
 
-- **Deterministic timeline.** Everything is computed from frame time, with Catmull-Rom splines and custom bezier easings.
-- **Motion blur.** `SubframeBlur` takes 8 centred sub-frames (a 180° shutter at 60 fps) only inside the `FAST` windows: the whips, the fly-out, the pull-back and the logo flash. Holds stay sharp.
-- **Localised light.** Two soft emerald/cyan lights move along the frame edges, keyed to the reference's light positions. They are drawn outside the sampler, so there is no banding.
-- **One camera for the UI.** The selector, menu, highlight and cursor all live in the same world space, so the push-ins, pans and tilts carry them together.
-- **Typography.**
-  - Fraunces (display serif) for the brand and the greeting.
-  - Inter for the interface and the capability words.
-  - JetBrains Mono for code, with ligatures off.
+The soundtrack is the reference's own audio, unchanged (same segment, speed, pitch and offset).
+- Its licence is unknown, so it is not committed. Extract it with `scripts/extract_audio.sh /path/to/reference.mp4`.
+- The last 0.6 s is a silent visual hold for the credit. The song is not stretched or repeated.
 
-## Assets
+## Fonts and assets
 
 | Asset | Source | Licence |
 |---|---|---|
 | OpenAI / ChatGPT mark | `public/brand/openai-logo.svg`, from `@lobehub/icons-static-svg` | MIT for the file; the mark is OpenAI's trademark |
-| Inter, JetBrains Mono, Fraunces | `public/fonts/` | SIL OFL, licences included |
-| Soundtrack | the reference video (not committed) | unknown, so not redistributed here |
+| Fraunces (display), Inter (interface, code, words) | `public/fonts/` | SIL OFL, licences included |
 
 ## Render
 
 ```bash
 npm install
 scripts/extract_audio.sh /path/to/reference.mp4
+npm run timing                                   # rebuild the timing map from analysis/*.json
 REMOTION_BROWSER=/path/to/chrome-headless-shell npm run render
-ffmpeg -i out/GPT_Astra_6_Concept_RefAudio_1920x1080_60fps.mp4 -c copy -movflags +faststart final.mp4
-node scripts/stills.mjs <outdir> <frame…>       # frame-accurate stills (COMP=AstraPromo for v1)
+ffmpeg -i out/GPT_Astra_6_Concept_v3_1920x1080_60fps.mp4 -c copy -movflags +faststart final.mp4
+node scripts/stills.mjs <outdir> <frame…>        # frame-accurate stills (COMP=AstraRef for v2)
 ```
+
+Python analysis needs `opencv-python-headless`, `numpy`, `scipy` and `matplotlib`.
