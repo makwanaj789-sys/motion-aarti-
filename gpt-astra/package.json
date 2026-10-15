@@ -2,13 +2,15 @@
   "name": "gpt-astra-concept",
   "private": true,
   "version": "1.0.0",
-  "description": "Fan-made 'GPT Astra 6' ChatGPT concept promo, 1920x1080 @ 60 fps (Remotion). Main composition: AstraRef.",
+  "description": "Fan-made 'GPT Astra 6' ChatGPT concept promo, 1920x1080 @ 60 fps (Remotion). Main composition: AstraV3.",
   "scripts": {
     "studio": "remotion studio src/index.ts",
     "audio:ref": "scripts/extract_audio.sh",
-    "render": "remotion render src/index.ts AstraRef out/GPT_Astra_6_Concept_RefAudio_1920x1080_60fps.mp4 --codec=h264 --crf=14 --pixel-format=yuv420p --audio-codec=aac --audio-bitrate=256k --concurrency=4",
+    "render": "remotion render src/index.ts AstraV3 out/GPT_Astra_6_Concept_v3_1920x1080_60fps.mp4 --codec=h264 --crf=12 --pixel-format=yuv420p --audio-codec=aac --audio-bitrate=320k --concurrency=4",
     "audio:v1": "python3 audio/make_audio.py public/audio/score.wav",
-    "render:v1": "remotion render src/index.ts AstraPromo out/GPT_Astra_6_Concept_1920x1080_60fps.mp4 --codec=h264 --crf=14 --pixel-format=yuv420p --audio-codec=aac --audio-bitrate=256k --concurrency=4"
+    "render:v1": "remotion render src/index.ts AstraPromo out/GPT_Astra_6_Concept_1920x1080_60fps.mp4 --codec=h264 --crf=14 --pixel-format=yuv420p --audio-codec=aac --audio-bitrate=256k --concurrency=4",
+    "render:v2": "remotion render src/index.ts AstraRef out/GPT_Astra_6_Concept_RefAudio_1920x1080_60fps.mp4 --codec=h264 --crf=14 --pixel-format=yuv420p --audio-codec=aac --audio-bitrate=256k --concurrency=4",
+    "timing": "python3 analysis/build_timing.py"
   },
   "dependencies": {
     "@fontsource/fraunces": "^5.3.0",
