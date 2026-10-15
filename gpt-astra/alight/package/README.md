@@ -33,6 +33,20 @@ The XML loads these fonts through Alight Motion's Google Fonts. If a phone has n
 
 The first XML made all text about 3× too big, so the letters overlapped. Alight Motion's text size unit is not a pixel: it is (shorter canvas side ÷ 360) px, so 3 px on a 1080p canvas. Every text size is now divided by 3, and the vertical position was corrected from a measurement in the app.
 
+## Shape size fix and full check (15 Oct, second fix)
+
+The second XML drew every shape twice as big (box, chips, menu, lights, logo frames), so the text looked tiny next to them. In Alight Motion's own shape templates (APK, , , ),  is half the width and height: the path runs from −size to +size. All shape sizes are now halved.
+
+The pointer is now a touch dot (two circles); the custom triangle drew as a line.
+
+**How it was tested.**  draws the XML with the app's rules:
+- text unit = canvas short side ÷ 360;
+- shape size = half extent;
+- location = layer centre;
+- keyframe t = fraction of the layer's duration.
+
+Applied to the previous XML, this preview reproduces your phone screenshots at 00:04:22 and 00:06:12. Applied to this XML at every 0.25 s (58 frames), it matches the video's layout: on average 98% of the bright (text/UI) pixels coincide within 2 px. The only differences are the glows, which the SAFE build leaves out. See .
+
 ## Import
 
 1. Unzip the package on your phone.

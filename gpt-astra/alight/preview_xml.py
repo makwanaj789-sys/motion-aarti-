@@ -69,14 +69,14 @@ def draw_scene(scene, t, M, canvas):
         elif el.attrib.get('fillType') == 'media':
             size = parse_vec(el.find("property[@name='size']").attrib['value'])
             sig = el.attrib['fillImage'].split('///')[1]
-            img = Image.open(os.path.join(media_dir, sig)).convert('RGBA').resize((max(1, round(size[0] * S)), max(1, round(size[1] * S))))
+            img = Image.open(os.path.join(media_dir, sig)).convert('RGBA').resize((max(1, round(2 * size[0] * S)), max(1, round(2 * size[1] * S))))  # size = half extent
             img.putalpha(img.getchannel('A').point(lambda v: v * op))
             layer.alpha_composite(img, (round(X - img.width / 2), round(Y - img.height / 2)))
         else:
             sp = el.find("property[@name='size']")
             if sp is None: continue  # custom path shapes are skipped in the preview
             size = keyed(sp, t, t0, t1, [100, 100])
-            w, h = size[0] * s0 * sc[0], size[1] * s0 * sc[1]
+            w, h = 2 * size[0] * s0 * sc[0], 2 * size[1] * s0 * sc[1]  # rect/roundrect/circle: size is the half extent
             box = [X - w / 2, Y - h / 2, X + w / 2, Y + h / 2]
             if gr is not None and gr.attrib.get('type') == 'radial':
                 # radial light: draw concentric ellipses fading to the end colour's alpha
@@ -89,12 +89,14 @@ def draw_scene(scene, t, M, canvas):
             else:
                 r = 0
                 rp = el.find("property[@name='cornerRadius']")
-                if rp is not None: r = float(rp.attrib['value']) * S
+                if rp is not None: r = min(float(rp.attrib['value']) * S, w / 2, h / 2)
                 if a > 0: d.rounded_rectangle(box, r, fill=rgb + (alpha,))
             b = el.find('border')
             if b is not None:
                 brgb, ba = argb(b.attrib['color'])
                 d.rounded_rectangle(box, r if el.attrib.get('s') != '.circle' else min(w, h) / 2, outline=brgb + (int(255 * ba * op),), width=max(1, round(float(b.attrib['size']) * S)))
+        rot = g('rotation', [0])[0]
+        if abs(rot) > 0.01: layer = layer.rotate(-rot, resample=Image.BICUBIC, center=(X, Y))  # positive = clockwise
         canvas.alpha_composite(layer)
 
 root = ET.parse(xml_path).getroot()

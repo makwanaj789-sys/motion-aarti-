@@ -167,11 +167,19 @@ class Layer:
                     out.append(f'{ind}    ' + self.keyable(None, fn, tol, typ, pname))
             out.append(f'{ind}  </effect>')
         out += [f'{ind}  {d}' for d in self.decor]  # edge decorations come before shape properties
+        half = self.attrs.get('s') in ('.rect', '.roundrect', '.circle')
         for p in self.props:
+            # the app's rect/roundrect/circle templates draw from -size to +size, so `size` is half the width/height
+            if half and isinstance(p, str) and 'name="size"' in p:
+                w_, h_ = [float(x) for x in re.search(r'value="([^"]+)"', p).group(1).split(',')]
+                p = f'<property name="size" type="vec2" value="{vec((w_ / 2, h_ / 2))}"/>'
+            elif half and not isinstance(p, str) and p[0] == 'size':
+                p = (p[0], p[1], (lambda t, f=p[2]: tuple(v / 2 for v in ev(f, t))), p[3] / 2)
             out.append(f'{ind}  ' + (p if isinstance(p, str) else self.keyable(None, p[2], p[3], p[1], p[0])))
         if self.body: out.append(self.body)
         out.append(f'{ind}</{self.tag}>')
         return '\n'.join(out)
+def ev(f, t): return f(t) if callable(f) else f
 def esc(s): return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
 
 def shape(label, t0, t1, slug, size, loc, color=None, alpha=1.0, opacity=1.0, scale=None, radius=None, gradient=None, tol_loc=0.25):
@@ -649,11 +657,14 @@ def safe(ls, cam=None, dt=0.0):
                 if L.fill and int(L.fill[1:3], 16) < 255: L.fill = '#FF0B1513'  # opaque, so the outline only shows at the edge
         if L.body.strip().startswith('<parameter>'):
             if L.label == 'Pointer':
-                L.attrs['s'] = '.triangle'; L.body = ''
-                L.props = ['<property name="p1" type="vec2" value="0.000000,0.000000"/>', '<property name="p2" type="vec2" value="0.000000,22.000000"/>',
-                           '<property name="p3" type="vec2" value="15.500000,15.500000"/>']
+                # a touch-dot cursor: white dot with a soft ring (plain circles, no custom path)
+                L.attrs['s'] = '.circle'; L.body = ''; L.fill = '#F2FFFFFF'
+                L.props = [f'<property name="size" type="vec2" value="{vec((18, 18))}"/>']
+                R_ = copy.copy(L); R_.tr = dict(L.tr); R_.attrs = dict(L.attrs); Layer._id += 1; R_.id = Layer._id
+                R_.label = 'Pointer ring'; R_.fill = '#40FFFFFF'; R_.props = [f'<property name="size" type="vec2" value="{vec((40, 40))}"/>']
+                out.append(R_)
             elif L.label.startswith('Selector chevron'):
-                T_ = Layer('text', L.label, L.t0, L.t1, fillType='color', size=num(24), font='googlefonts?name=Inter&amp;weight=500', wrapWidth='60', align='center')
+                T_ = Layer('text', L.label, L.t0, L.t1, fillType='color', size=num(24 / TEXT_UNIT), font='googlefonts?name=Inter&amp;weight=500', wrapWidth='60', align='center')
                 rot = L.tr.get('rotation', (0.0, 0.2))[0]
                 T_.tr = dict(L.tr); T_.tr['rotation'] = ((lambda T, rot=rot: 90 + ev(rot, T)), 0.2)
                 T_.fill = L.fill; T_.body = '    <content>›</content>'
