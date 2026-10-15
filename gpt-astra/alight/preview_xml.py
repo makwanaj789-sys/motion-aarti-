@@ -14,6 +14,7 @@ xml_path, media_dir, out_dir, *times = sys.argv[1:]
 os.makedirs(out_dir, exist_ok=True)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONTS = {}
+TEXT_UNIT = 3.0  # Alight Motion text size unit on a 1080p canvas
 def font(family, weight, size):
     key = (family, weight)
     if key not in FONTS:
@@ -61,10 +62,10 @@ def draw_scene(scene, t, M, canvas):
         alpha = int(255 * a * op)
         if el.tag == 'text':
             fam = 'Fraunces' if 'Fraunces' in el.attrib['font'] else 'Inter'
-            wt = int(el.attrib['font'].split('weight=')[1]); size = float(el.attrib['size']) * S
+            wt = int(el.attrib['font'].split('weight=')[1]); size = float(el.attrib['size']) * TEXT_UNIT * S
             f = font(fam, wt, size); txt = el.find('content').text or ''
             asc, desc = f.getmetrics()
-            d.text((X - f.getlength(txt) / 2, Y - (asc + desc) / 2), txt, font=f, fill=rgb + (alpha,))
+            d.text((X - f.getlength(txt) / 2, Y - (asc + desc) / 2 + 0.032 * size), txt, font=f, fill=rgb + (alpha,))
         elif el.attrib.get('fillType') == 'media':
             size = parse_vec(el.find("property[@name='size']").attrib['value'])
             sig = el.attrib['fillImage'].split('///')[1]

@@ -24,6 +24,7 @@ os.makedirs(OUT, exist_ok=True)
 W, H, CX, CY = 1920, 1080, 960, 540
 DUR = 14.6
 SR = 60  # sampling rate for keyframes
+TEXT_UNIT = min(1920, 1080) / 360
 SAFE = os.environ.get('AM_SAFE') == '1'      # only plain shapes/text/media + transform keyframes
 NOMEDIA = os.environ.get('AM_NOMEDIA') == '1'  # additionally no image/audio references (logo as a placeholder shape)
 
@@ -91,8 +92,10 @@ class Font:
             g = self.glyf[self.cmap.get(ord(c), 'space')] if self.glyf else None
             if g is not None and hasattr(g, 'yMin'): bot = min(bot, g.yMin)
         return -bot * size / self.upm
-    def centre_y(self, baseline, size):  # Alight Motion centres a text layer on its line box
-        return baseline - (self.asc - self.desc) / 2 * size / self.upm
+    def centre_y(self, baseline, size):
+        # Alight Motion centres a text layer on its line box; measured in the app (Fraunces at size 252 on a 1080p canvas)
+        # its baseline sits ~0.032 em lower than the hhea-metrics estimate
+        return baseline - ((self.asc - self.desc) / 2 / self.upm + 0.032) * size
 INTER = {w: Font(f'inter-latin-{w}-normal') for w in (400, 500, 600)}
 FRAUN = Font('fraunces-latin-400-normal')
 def size_for(s, width, font): return width / font.width(s, 100) * 100
@@ -193,7 +196,9 @@ def contour(label, t0, t1, d, loc, color, alpha=1.0, opacity=1.0, scale=None, ro
 def text(label, t0, t1, content, font, weight, size, loc, color='#F4F7F8', alpha=1.0, opacity=1.0, scale=None, wrap=None):
     fam = 'Fraunces' if font is FRAUN else 'Inter'
     w = font.width(content, size)
-    L = Layer('text', label, t0, t1, fillType='color', size=num(size), font=f'googlefonts?name={fam}&amp;weight={weight}',
+    # Alight Motion's text size unit is (shorter canvas side / 360) px: 3 px on a 1080p canvas (measured in the app, and it is
+    # what the app's own presets imply: size 48 with a 632 px wrap box on a 1080 canvas)
+    L = Layer('text', label, t0, t1, fillType='color', size=num(size / TEXT_UNIT), font=f'googlefonts?name={fam}&amp;weight={weight}',
               wrapWidth=str(int(wrap or (w + size * 2 + 40))), align='center')
     L.anim('location', loc, 0.25)
     if scale is not None: L.anim('scale', scale, 0.0015)

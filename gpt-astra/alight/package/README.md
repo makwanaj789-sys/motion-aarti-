@@ -29,6 +29,10 @@ The XML loads these fonts through Alight Motion's Google Fonts. If a phone has n
 
 `Fraunces-Regular.ttf` is a static file made from the variable font (optical size 14, weight 400). It is the closest match to the video.
 
+## Text size fix (15 Oct)
+
+The first XML made all text about 3× too big, so the letters overlapped. Alight Motion's text size unit is not a pixel: it is (shorter canvas side ÷ 360) px, so 3 px on a 1080p canvas. Every text size is now divided by 3, and the vertical position was corrected from a measurement in the app.
+
 ## Import
 
 1. Unzip the package on your phone.
