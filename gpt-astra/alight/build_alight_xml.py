@@ -24,6 +24,8 @@ os.makedirs(OUT, exist_ok=True)
 W, H, CX, CY = 1920, 1080, 960, 540
 DUR = 14.6
 SR = 60  # sampling rate for keyframes
+SAFE = os.environ.get('AM_SAFE') == '1'      # only plain shapes/text/media + transform keyframes
+NOMEDIA = os.environ.get('AM_NOMEDIA') == '1'  # additionally no image/audio references (logo as a placeholder shape)
 
 # ----------------------------------------------------------------- measured data (same arrays as src/refData.ts)
 REF = {}
@@ -463,6 +465,7 @@ def nested(label, t0, t1, inner, loc, scale, mblur=None):
             f'totalTime="{round((t1 - t0) * 1000)}" fps="60" ffver="106" amver="1028425" am="com.alightcreative.motion/5.0.273.1028425" amplatform="android">\n'
             + '\n'.join(x.xml('      ') for x in inner) + '\n    </scene>')
     L.body = body
+    L.inner, L.cam = inner, (loc, scale)
     return L
 UC = REF['UI_CAM']
 layers.append(nested('Chat UI (camera)', UI0, UI1, ui,
@@ -587,12 +590,93 @@ layers.append(L)
 fm = f400.width('FAN-MADE CONCEPT', 16)
 layers.append(text('Fan-made label', 0, 0.95, 'FAN-MADE CONCEPT', f400, 400, 16, (W - 40 - fm / 2, f400.centre_y(H - 32 - 4, 16)), alpha=0.42, opacity=lambda t: 1 - seg(t, 0.7, 0.95)))
 
+# ================================================================= safe mode: rewrite risky features into plain layers
+import copy
+def ev(f, t): return f(t) if callable(f) else f
+def shifted(f, dt): return (lambda T, f=f: f(T - dt)) if callable(f) else f
+def safe(ls, cam=None, dt=0.0):
+    out = []
+    for L in ls:
+        if L.tag == 'embedScene':
+            out += safe(L.inner, L.cam, L.t0); continue
+        if L.label == 'Menu ring': continue  # a blurred ring cannot be built from plain layers
+        L.effects = []
+        if dt or cam:  # move a nested-scene layer to the main timeline, through the camera
+            L.t0 += dt; L.t1 += dt
+            L.tr = {k: (shifted(f, dt), tol) for k, (f, tol) in L.tr.items()}
+            L.props = [p if isinstance(p, str) else (p[0], p[1], shifted(p[2], dt), p[3]) for p in L.props]
+            cl, cs = cam
+            loc0, ltol = L.tr['location']; sc0 = L.tr.get('scale', ((1.0, 1.0), 0.0015))[0]
+            L.tr['location'] = (lambda T, loc0=loc0, cl=cl, cs=cs: (ev(cl, T)[0] + ev(cs, T)[0] * (ev(loc0, T)[0] - CX), ev(cl, T)[1] + ev(cs, T)[0] * (ev(loc0, T)[1] - CY)), 0.3)
+            L.tr['scale'] = (lambda T, sc0=sc0, cs=cs: (ev(cs, T)[0] * ev(sc0, T)[0], ev(cs, T)[0] * ev(sc0, T)[1]), 0.0015)
+        if L.gradient:
+            m = re.search(r'startColor="#(..)(......)"', L.gradient); a = int(m.group(1), 16) / 255
+            radial_ = 'radial' in L.gradient and 'endColor="#00' in L.gradient
+            L.attrs['fillType'] = 'color'; L.gradient = None
+            if L.label.startswith('Light') or L.label.endswith('bloom'):
+                # soft light from concentric circles
+                for f_, k in ((1.0, 0.07), (0.87, 0.08), (0.75, 0.09), (0.63, 0.1), (0.52, 0.11), (0.41, 0.12), (0.3, 0.13), (0.19, 0.14)):
+                    C_ = copy.copy(L); C_.tr = dict(L.tr); C_.attrs = dict(L.attrs, s='.circle'); Layer._id += 1; C_.id = Layer._id
+                    sc, tol = L.tr.get('scale', ((1.0, 1.0), 0.0015))
+                    C_.tr['scale'] = (lambda T, sc=sc, f_=f_: (ev(sc, T)[0] * f_, ev(sc, T)[1] * f_), tol)
+                    C_.fill = col(m.group(2), a * k); C_.label = f'{L.label} ({round(f_ * 100)}%)'
+                    out.append(C_)
+                continue
+            L.fill = col(m.group(2), a * (0.6 if radial_ else 1.0))
+        if L.decor:
+            b = next((d for d in L.decor if d.startswith('<border')), None)
+            L.decor = []
+            if b and L.label not in ('Pointer', 'Menu highlight'):
+                bc = re.search(r'color="([^"]+)"', b).group(1); bw = float(re.search(r'size="([^"]+)"', b).group(1))
+                O = copy.copy(L); O.tr = dict(L.tr); O.attrs = dict(L.attrs); Layer._id += 1; O.id = Layer._id; O.label = L.label + ' outline'
+                O.fill = bc
+                def grow(p, bw=bw):
+                    if isinstance(p, str):
+                        if 'name="size"' in p:
+                            w_, h_ = [float(x) for x in re.search(r'value="([^"]+)"', p).group(1).split(',')]
+                            return f'<property name="size" type="vec2" value="{vec((w_ + 2 * bw, h_ + 2 * bw))}"/>'
+                        if 'cornerRadius' in p:
+                            r_ = float(re.search(r'value="([^"]+)"', p).group(1)); return f'<property name="cornerRadius" type="float" value="{num(r_ + bw)}"/>'
+                        return p
+                    return (p[0], p[1], (lambda T, f=p[2]: (ev(f, T)[0] + 2 * bw, ev(f, T)[1] + 2 * bw)), p[3])
+                O.props = [grow(p) for p in L.props]
+                out.append(O)
+                if L.fill and int(L.fill[1:3], 16) < 255: L.fill = '#FF0B1513'  # opaque, so the outline only shows at the edge
+        if L.body.strip().startswith('<parameter>'):
+            if L.label == 'Pointer':
+                L.attrs['s'] = '.triangle'; L.body = ''
+                L.props = ['<property name="p1" type="vec2" value="0.000000,0.000000"/>', '<property name="p2" type="vec2" value="0.000000,22.000000"/>',
+                           '<property name="p3" type="vec2" value="15.500000,15.500000"/>']
+            elif L.label.startswith('Selector chevron'):
+                T_ = Layer('text', L.label, L.t0, L.t1, fillType='color', size=num(24), font='googlefonts?name=Inter&amp;weight=500', wrapWidth='60', align='center')
+                rot = L.tr.get('rotation', (0.0, 0.2))[0]
+                T_.tr = dict(L.tr); T_.tr['rotation'] = ((lambda T, rot=rot: 90 + ev(rot, T)), 0.2)
+                T_.fill = L.fill; T_.body = '    <content>›</content>'
+                out.append(T_); continue
+            elif L.label.startswith('Check'):
+                for k, (dx, dy, w_, rot) in enumerate(((-3.0, 1.5, 7.0, 45.0), (2.0, -0.5, 13.0, -50.0))):
+                    R_ = Layer('shape', f'{L.label} stroke {k + 1}', L.t0, L.t1, fillType='color', s='.rect')
+                    loc0 = L.tr['location'][0]
+                    R_.tr = dict(L.tr); R_.tr['location'] = ((lambda T, loc0=loc0, dx=dx, dy=dy: (ev(loc0, T)[0] + dx, ev(loc0, T)[1] + dy)), 0.25)
+                    R_.tr['rotation'] = (rot, 0.2); R_.fill = L.fill
+                    R_.props = [f'<property name="size" type="vec2" value="{vec((w_, 2.6))}"/>']
+                    out.append(R_)
+                continue
+        if NOMEDIA and L.attrs.get('fillType') == 'media':
+            L.attrs = {'fillType': 'color', 's': '.circle'}; L.fill = '#E6F4F7F8'; L.label += ' (placeholder: set fill to chatgpt_logo_white.png)'
+        if NOMEDIA and L.tag == 'audio': continue
+        out.append(L)
+    return out
+if SAFE:
+    layers = safe(layers)
+
 # ================================================================= audio + document
 media = [f'  <media uri="am-internal:///{LOGO_SIG}.png" filename="{LOGO_SIG}.png" title="chatgpt_logo_white" type="image/png" size="{len(png)}" sig="{LOGO_SIG}" width="1024" height="1024"/>']
 if AUDIO_SIG:
     media.append(f'  <media uri="am-internal:///{AUDIO_SIG}.wav" filename="{AUDIO_SIG}.wav" title="reference_audio" type="audio/wav" size="{os.path.getsize(AUDIO)}" duration="14017" sig="{AUDIO_SIG}"/>')
     au = Layer('audio', 'Reference audio (original song)', 0, 14.017, src=f'am-internal:///{AUDIO_SIG}.wav', inTime='0', outTime='14017')
     layers.insert(0, au)
+if NOMEDIA: media = []
 total_ms = round(DUR * 1000)
 doc = ['<?xml version=\'1.0\' encoding=\'UTF-8\' ?>',
        '<!-- GPT Astra 6 (fan-made concept) v3. Generated by gpt-astra/alight/build_alight_xml.py from the measured timing map. -->',
@@ -600,6 +684,7 @@ doc = ['<?xml version=\'1.0\' encoding=\'UTF-8\' ?>',
        f'totalTime="{total_ms}" fps="60" modifiedTime="1792000000000" amver="1028425" ffver="106" am="com.alightcreative.motion/5.0.273.1028425" amplatform="android">']
 doc += media + [l.xml('  ') for l in layers] + ['</scene>']
 xml = '\n'.join(doc) + '\n'
-open(os.path.join(OUT, 'GPT_Astra_6_v3.xml'), 'w').write(xml)
+NAME = 'GPT_Astra_6_v3' + ('_SAFE' if SAFE else '') + ('_NOMEDIA' if NOMEDIA else '')
+open(os.path.join(OUT, NAME + '.xml'), 'w').write(xml)
 def count(ls): return sum(1 + (count(getattr(l, 'inner', [])) if False else 0) for l in ls)
 print(f'layers: main {len(layers)}, ui {len(ui)}, code {len(code)}; keyframes {xml.count("<kf ")}; {len(xml) / 1e6:.2f} MB')

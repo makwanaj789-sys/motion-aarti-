@@ -46,3 +46,15 @@ python3 alight/preview_xml.py <out_dir>/GPT_Astra_6_v3.xml <out_dir> <preview_di
 
 - Alight Motion APK assets (official exported presets, e.g. `assets/effects/presets/*.xml`), via https://github.com/kuchingneko28/alight-motion-docs (community docs, not affiliated with Alight Creative)
 - Project format notes: https://github.com/kuchingneko28/alight-motion-docs/blob/main/docs/authoring.md
+
+## If the import shows "Unknown error"
+
+The first build failed to import on one phone with a generic "Unknown error". Two simpler builds and a set of small test files were added to find the cause:
+
+| File | What it leaves out |
+|---|---|
+| `GPT_Astra_6_v3_SAFE.xml` | Only plain shapes, text, the logo image and the audio, with transform keyframes. No nested scenes (the camera is baked into every layer), no gradients (lights are stacked soft circles), no border/glow/shadow decorations (outlines are layers), no custom paths, no effects (no blur/glow) |
+| `GPT_Astra_6_v3_SAFE_NOMEDIA.xml` | Same as SAFE, plus no image or audio references. The logo layers are white circles named "(placeholder …)": set their fill to `chatgpt_logo_white.png`, and add the audio by hand |
+| `import-tests/T01…T11*.xml` | One feature each: minimal rect, Inter text, keyframes, gradient, border/glow/shadow, custom path, effects, nested scene + motion blur, image media, audio media, 1920×1080 60 fps |
+
+Try SAFE first, then SAFE_NOMEDIA. Then say which `T…` files import and which fail; that tells exactly which feature to change in the full build.
