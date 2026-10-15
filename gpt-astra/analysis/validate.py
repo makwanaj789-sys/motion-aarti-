@@ -80,8 +80,13 @@ rl = [o for o in tr['logo'] if 30 <= o['f'] <= 60]
 rp = [(o['f'] / 30, (o['cx'] - 643) / (338 - 643)) for o in rl]
 op = []
 for t, _ in rp:
-    b = bright_box(O(round(t * 60)), 0, 440 if t > 1.28 else 1280)  # left of the first letter
-    op.append(b[2] if b else np.nan)
+    # the logo is the leftmost cluster of bright components (letters sit to its right)
+    g = cv2.cvtColor(O(round(t * 60)), cv2.COLOR_BGR2GRAY)
+    n, lab, st, cen = cv2.connectedComponentsWithStats((g > 150).astype(np.uint8), connectivity=8)
+    comps = [(st[k][0], st[k][0] + st[k][2]) for k in range(1, n) if st[k][4] > 30]
+    if not comps: op.append(np.nan); continue
+    x0 = min(c[0] for c in comps); grp = [c for c in comps if c[0] < x0 + 140]
+    op.append((min(c[0] for c in grp) + max(c[1] for c in grp)) / 2)
 op = np.array(op); op = (op - op[0]) / (op[-1] - op[0])
 rep['logo_slide_progress_max_err'] = round(float(np.nanmax(np.abs(op - np.array([p for _, p in rp])))), 3)
 # end logo width
